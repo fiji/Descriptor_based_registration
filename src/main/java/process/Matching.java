@@ -8,7 +8,6 @@ import ij.ImagePlus;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
 import ij.measure.Calibration;
-import imagej.updater.core.Diff;
 
 import java.io.File;
 import java.io.FileWriter;
