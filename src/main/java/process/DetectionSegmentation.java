@@ -5,10 +5,6 @@ import ij.IJ;
 import java.util.ArrayList;
 import java.util.Date;
 
-import net.imglib2.RandomAccessible;
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.img.Img;
-import net.imglib2.view.Views;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianReal1;
 import mpicbg.imglib.algorithm.scalespace.SubpixelLocalization;
@@ -18,10 +14,12 @@ import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.imglib.wrapper.ImgLib1;
 import mpicbg.spim.io.IOFunctions;
 import mpicbg.spim.registration.ViewStructure;
+import net.imglib2.RandomAccessible;
+import net.imglib2.view.Views;
 
 public class DetectionSegmentation
 {
-	public static double distanceThreshold = 3;
+	public static double distanceThreshold = 1.5;
 
 	public static ArrayList< DifferenceOfGaussianPeak< FloatType > > extractBeadsLaPlaceImgLib( 
 			final Image< FloatType > img,
@@ -170,9 +168,9 @@ public class DetectionSegmentation
 
 			int countRemove = 0;
 
-			final RandomAccessible< net.imglib2.type.numeric.real.FloatType > imgLib2 = Views.extendMirrorSingle( ImgLib1.wrapFloatToImgLib2( img ) );
+			final RandomAccessible< net.imglib2.type.numeric.real.FloatType > imgLib2 = ImgLib1.wrapFloatToImgLib2( img );
 			
-			// gaussian fit without background subtraction
+			// gaussian fit (removes and adds the background after its done)
 			for ( int i = peakList.size() - 1; i >= 0; --i )
 			{
 				final DifferenceOfGaussianPeak< FloatType > maximum = peakList.get( i );
@@ -180,7 +178,7 @@ public class DetectionSegmentation
 				for ( int d = 0; d < n; ++d )
 					loc[ d ] = p[ d ] = maximum.getPosition( d );
 
-				getRangeForFit( min, max, region, p );
+				getRangeForFit( min, max, region, p, img );
 
 				GaussianMaskFit.gaussianMaskFit( Views.interval( imgLib2, min, max ), loc, sigma, iterations );
 
@@ -208,12 +206,18 @@ public class DetectionSegmentation
 		
 	}
 
-	public static void getRangeForFit( final long[] min, final long[] max, final int[] range, final int[] p )
+	public static void getRangeForFit( final long[] min, final long[] max, final int[] range, final int[] p, final Image<?> img )
 	{
 		for ( int d = 0; d < p.length; ++d )
 		{
 			min[ d ] = p[ d ] - range[ d ]/2;
 			max[ d ] = p[ d ] + range[ d ]/2;
+
+			if ( min[ d ] < 0 )
+				min[ d ] = 0;
+
+			if ( max[ d ] >= img.getDimension( d ) )
+				max[ d ] = img.getDimension( d ) - 1;
 		}
 	}
 

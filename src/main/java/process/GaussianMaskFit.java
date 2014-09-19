@@ -38,7 +38,7 @@ public class GaussianMaskFit
 		final IterableInterval<FloatType> translatedIterableMask = Views.iterable( translatedMask );
 		
 		// remove background in the input
-		// removeBackground( signalIterable );
+		final double bg = removeBackground( signalIterable );
 		
 		double N = 0;
 		int i = 0;
@@ -93,10 +93,11 @@ public class GaussianMaskFit
 		}
 		while ( i < iterations );
 		
+		restoreBackground( signalIterable, bg );
 		//ImageJFunctions.show( interval );
 	}
 	
-	public static void removeBackground( final IterableInterval< FloatType > iterable )
+	public static double removeBackground( final IterableInterval< FloatType > iterable )
 	{
 		double i = 0;
 		
@@ -107,8 +108,16 @@ public class GaussianMaskFit
 		
 		for ( final FloatType t : iterable )
 			t.setReal( t.get() - i );
+		
+		return i;
 	}
-	
+
+	public static void restoreBackground( final IterableInterval< FloatType > iterable, final double value )
+	{
+		for ( final FloatType t : iterable )
+			t.setReal( t.get() + value );
+	}
+
 	final public static void setGaussian( final IterableInterval< FloatType > image, final double[] location, final double[] two_sq_sigma )
 	{
 		final int numDimensions = image.numDimensions();
