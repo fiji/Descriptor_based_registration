@@ -763,14 +763,17 @@ public class Descriptor_based_registration implements PlugIn
 				final SimilarityModel2D model = new SimilarityModel2D();
 				model.set( (float)( defaultScale*Math.cos( Math.toRadians( defaultDegrees1 ) ) ), (float)( defaultScale * Math.sin( Math.toRadians( defaultDegrees1 ) ) ), 0, 0 );
 				params.initialModel = model;
-			}			
+			}
 			else
 			{
 				IJ.log( "Unfortunately this is not supported this model yet ... " );
 				return null;
-			}					
+			}
 		}
-		
+
+		if ( localization == 2 && !Descriptor_based_series_registration.getGaussianParameters( dimensionality, params ) )
+			return null;
+
 		return params;
 	}
 	

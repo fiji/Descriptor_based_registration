@@ -194,7 +194,17 @@ public class Descriptor_based_series_registration implements PlugIn
 	public static int defaultResult = 0;
 
 	public static String defaultDirectory = "";
-	
+
+	public static double defaultSigmaX = 2;
+	public static double defaultSigmaY = 2;
+	public static double defaultSigmaZ = 2;
+
+	public static int defaultSupportX = 11;
+	public static int defaultSupportY = 11;
+	public static int defaultSupportZ = 11;
+
+	public static int defaultIterations = 10;
+
 	/**
 	 * Ask for all other required parameters ..
 	 * 
@@ -226,7 +236,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		gd.addChoice( "Brightness_of detections", detectionBrightness, detectionBrightness[ defaultDetectionBrightness ] );
 		gd.addChoice( "Approximate_size of detections", detectionSize, detectionSize[ defaultDetectionSize ] );
 		gd.addChoice( "Type_of_detections", detectionTypes, detectionTypes[ defaultDetectionType ] );
-		gd.addChoice( "Localiztion", localizationChoice, localizationChoice[ defaultLocalization ] );
+		gd.addChoice( "Subpixel_Localization", localizationChoice, localizationChoice[ defaultLocalization ] );
 		
 		gd.addChoice( "Transformation_model", transformationModel, transformationModel[ defaultTransformationModel ] );
 		gd.addCheckbox( "Regularize_model", defaultRegularize );
@@ -504,9 +514,13 @@ public class Descriptor_based_series_registration implements PlugIn
 			else
 			{
 				params.lookForMinima = false;
-				params.lookForMaxima = true;				
-			}			
+				params.lookForMaxima = true;
+			}
 		}
+
+		if ( localization == 2 && !Descriptor_based_series_registration.getGaussianParameters( dimensionality, params ) )
+			return null;
+
 		// set the new default values
 		defaultSigma = params.sigma1;
 		defaultThreshold = params.threshold;
@@ -536,6 +550,49 @@ public class Descriptor_based_series_registration implements PlugIn
 		params.localization = localization;
 		
 		return params;
+	}
+
+	public static boolean getGaussianParameters( final int dimensionality, final DescriptorParameters params )
+	{
+		final GenericDialog gdGauss = new GenericDialog( "Define Gaussian Fit Parameters" );
+
+		gdGauss.addNumericField( "Sigma_X [px units]", defaultSigmaX, 4 );
+		gdGauss.addNumericField( "Sigma_Y [px units]", defaultSigmaY, 4 );
+
+		if ( dimensionality == 3 )
+			gdGauss.addNumericField( "Sigma_Z [px units]", defaultSigmaZ, 4 );
+
+		gdGauss.addMessage( "" );
+
+		gdGauss.addNumericField( "Support_region_size_for_fit_X [px]", defaultSupportX, 0 );
+		gdGauss.addNumericField( "Support_region_size_for_fit_Y [px]", defaultSupportY, 0 );
+
+		if ( dimensionality == 3 )
+		gdGauss.addNumericField( "Support_region_size_for_fit_Z [px]", defaultSupportZ, 0 );
+
+		gdGauss.addMessage( "" );
+
+		gdGauss.addNumericField( "Iterations", defaultIterations, 0 );
+
+		gdGauss.showDialog();
+		if ( gdGauss.wasCanceled() )
+			return false;
+
+		params.sigma = new double[ dimensionality ];
+		params.sigma[ 0 ] = defaultSigmaX = gdGauss.getNextNumber();
+		params.sigma[ 1 ] = defaultSigmaY = gdGauss.getNextNumber();
+		if ( dimensionality == 3 )
+			params.sigma[ 2 ] = defaultSigmaZ = gdGauss.getNextNumber();
+
+		params.region = new int[ dimensionality ];
+		params.region[ 0 ] = defaultSupportX = (int)Math.round( gdGauss.getNextNumber() );
+		params.region[ 1 ] = defaultSupportY = (int)Math.round( gdGauss.getNextNumber() );
+		if ( dimensionality == 3 )
+			params.region[ 2 ] = defaultSupportZ = (int)Math.round( gdGauss.getNextNumber() );
+
+		params.iterations = defaultSupportX = (int)Math.round( gdGauss.getNextNumber() );
+
+		return true;
 	}
 	
 }

@@ -108,4 +108,9 @@ public class DescriptorParameters
 	public ArrayList<PointMatch> inliers = null;
 	public InvertibleBoundable model1 = null;
 	public InvertibleBoundable model2 = null;
+
+	// gaussian parameters
+	public double[] sigma;
+	public int[] region;
+	public int iterations;
 }
