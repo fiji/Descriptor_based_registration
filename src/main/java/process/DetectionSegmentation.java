@@ -166,7 +166,8 @@ public class DetectionSegmentation
 			final int[] p = new int[ n ];
 			final double[] loc = new double[ n ];
 
-			int countRemove = 0;
+			int countRemoveDistance = 0;
+			int countRemoveBorder = 0;
 
 			final RandomAccessible< net.imglib2.type.numeric.real.FloatType > imgLib2 = ImgLib1.wrapFloatToImgLib2( img );
 			
@@ -178,7 +179,12 @@ public class DetectionSegmentation
 				for ( int d = 0; d < n; ++d )
 					loc[ d ] = p[ d ] = maximum.getPosition( d );
 
-				getRangeForFit( min, max, region, p, img );
+				if ( !getRangeForFit( min, max, region, p, img ) )
+				{
+					++countRemoveBorder;
+					peakList.remove( i );
+					continue;
+				}
 
 				GaussianMaskFit.gaussianMaskFit( Views.interval( imgLib2, min, max ), loc, sigma, iterations );
 
@@ -189,7 +195,7 @@ public class DetectionSegmentation
 
 				if ( distance > distanceThreshold )
 				{
-					++countRemove;
+					++countRemoveDistance;
 					peakList.remove( i );
 				}
 				else
@@ -199,26 +205,26 @@ public class DetectionSegmentation
 				}
 			}
 
-			IJ.log( "Removed " + countRemove + " detections because the Gaussian fit moved it by more than " + distanceThreshold + " pixels.");
+			IJ.log( "Removed " + countRemoveBorder + " detections because the region was too close to the image boundary (try reducing the support region to reduce this number).");
+			IJ.log( "Removed " + countRemoveDistance + " detections because the Gaussian fit moved it by more than " + distanceThreshold + " pixels.");
 		}
 		
 		return peakList;
 		
 	}
 
-	public static void getRangeForFit( final long[] min, final long[] max, final int[] range, final int[] p, final Image<?> img )
+	public static boolean getRangeForFit( final long[] min, final long[] max, final int[] range, final int[] p, final Image<?> img )
 	{
 		for ( int d = 0; d < p.length; ++d )
 		{
 			min[ d ] = p[ d ] - range[ d ]/2;
 			max[ d ] = p[ d ] + range[ d ]/2;
 
-			if ( min[ d ] < 0 )
-				min[ d ] = 0;
-
-			if ( max[ d ] >= img.getDimension( d ) )
-				max[ d ] = img.getDimension( d ) - 1;
+			if ( min[ d ] < 0 || max[ d ] >= img.getDimension( d ) )
+				return false;
 		}
+
+		return true;
 	}
 
 	public static double computeK( final float stepsPerOctave ) { return Math.pow( 2f, 1f / stepsPerOctave ); }
