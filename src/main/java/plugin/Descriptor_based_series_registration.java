@@ -18,7 +18,6 @@ import mpicbg.models.AffineModel3D;
 import mpicbg.models.HomographyModel2D;
 import mpicbg.models.InterpolatedAffineModel2D;
 import mpicbg.models.InterpolatedAffineModel3D;
-import mpicbg.models.InterpolatedModel;
 import mpicbg.models.InvertibleBoundable;
 import mpicbg.models.RigidModel2D;
 import mpicbg.models.RigidModel3D;
@@ -160,7 +159,9 @@ public class Descriptor_based_series_registration implements PlugIn
 
 	public String[] transformationModels2d = new String[] { "Translation (2d)", "Rigid (2d)", "Similarity (2d)", "Affine (2d)", "Homography (2d)" };
 	public String[] transformationModels3d = new String[] { "Translation (3d)", "Rigid (3d)", "Affine (3d)" };
+	public static String[] localizationChoice = { "None", "3-dimensional quadratic fit", "Gaussian mask localization fit" };
 	public static int defaultTransformationModel = 1;
+	public static int defaultLocalization = 1;
 	public static int defaultRegularizationTransformationModel = 1;
 	public static double defaultLambda = 0.1;
 	public static boolean defaultFixFirstTile = false;
@@ -225,6 +226,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		gd.addChoice( "Brightness_of detections", detectionBrightness, detectionBrightness[ defaultDetectionBrightness ] );
 		gd.addChoice( "Approximate_size of detections", detectionSize, detectionSize[ defaultDetectionSize ] );
 		gd.addChoice( "Type_of_detections", detectionTypes, detectionTypes[ defaultDetectionType ] );
+		gd.addChoice( "Localiztion", localizationChoice, localizationChoice[ defaultLocalization ] );
 		
 		gd.addChoice( "Transformation_model", transformationModel, transformationModel[ defaultTransformationModel ] );
 		gd.addCheckbox( "Regularize_model", defaultRegularize );
@@ -275,6 +277,8 @@ public class Descriptor_based_series_registration implements PlugIn
 		final int detectionBrightnessIndex = gd.getNextChoiceIndex();
 		final int detectionSizeIndex = gd.getNextChoiceIndex();
 		final int detectionTypeIndex = gd.getNextChoiceIndex();
+		final int localization = gd.getNextChoiceIndex();
+
 		final int transformationModelIndex = gd.getNextChoiceIndex();
 		final boolean regularize = gd.getNextBoolean();
 		final boolean similarOrientation = gd.getNextBoolean();
@@ -292,6 +296,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		defaultDetectionBrightness = detectionBrightnessIndex;
 		defaultDetectionSize = detectionSizeIndex;
 		defaultDetectionType = detectionTypeIndex;
+		defaultLocalization = localization;
 		defaultTransformationModel = transformationModelIndex;
 		defaultRegularize = regularize;
 		defaultSimilarOrientation = similarOrientation;
@@ -528,6 +533,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		params.globalOpt = globalOptIndex;
 		params.range = range;
 		params.dimensionality = dimensionality;
+		params.localization = localization;
 		
 		return params;
 	}

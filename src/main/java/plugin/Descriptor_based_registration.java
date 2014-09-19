@@ -1,18 +1,17 @@
 package plugin;
 
-import javax.media.j3d.Transform3D;
-import javax.vecmath.Vector3d;
-
 import fiji.plugin.Apply_External_Transformation;
 import fiji.plugin.Bead_Registration;
 import fiji.stacks.Hyperstack_rearranger;
-import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
 import ij.plugin.PlugIn;
+
+import javax.media.j3d.Transform3D;
+
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.models.AffineModel2D;
 import mpicbg.models.AffineModel3D;
@@ -238,7 +237,8 @@ public class Descriptor_based_registration implements PlugIn
 		gd.addChoice( "Brightness_of detections", detectionBrightness, detectionBrightness[ defaultDetectionBrightness ] );
 		gd.addChoice( "Approximate_size of detections", detectionSize, detectionSize[ defaultDetectionSize ] );
 		gd.addChoice( "Type_of_detections", detectionTypes, detectionTypes[ defaultDetectionType ] );
-		
+		gd.addChoice( "Subpixel_Localization", Descriptor_based_series_registration.localizationChoice, Descriptor_based_series_registration.localizationChoice[ Descriptor_based_series_registration.defaultLocalization ] );
+
 		gd.addChoice( "Transformation_model", transformationModel, transformationModel[ defaultTransformationModel ] );
 		gd.addCheckbox( "Regularize_model", defaultRegularize );
 		gd.addChoice( "Images_pre-alignemnt", orientation, orientation[ defaultSimilarOrientation ] );
@@ -294,6 +294,8 @@ public class Descriptor_based_registration implements PlugIn
 		final int detectionBrightnessIndex = gd.getNextChoiceIndex();
 		final int detectionSizeIndex = gd.getNextChoiceIndex();
 		final int detectionTypeIndex = gd.getNextChoiceIndex();
+		final int localization = gd.getNextChoiceIndex();
+
 		final int transformationModelIndex = gd.getNextChoiceIndex();
 		final boolean regularize = gd.getNextBoolean();
 		final int similarOrientation = gd.getNextChoiceIndex();
@@ -312,6 +314,7 @@ public class Descriptor_based_registration implements PlugIn
 		defaultDetectionBrightness = detectionBrightnessIndex;
 		defaultDetectionSize = detectionSizeIndex;
 		defaultDetectionType = detectionTypeIndex;
+		Descriptor_based_series_registration.defaultLocalization = localization;
 		defaultTransformationModel = transformationModelIndex;
 		defaultRegularize = regularize;
 		defaultSimilarOrientation = similarOrientation;
@@ -526,7 +529,8 @@ public class Descriptor_based_registration implements PlugIn
 		else
 			params.fuse = 2;
 		params.setPointsRois = addPointRoi;
-		
+		params.localization = localization;
+
 		// ask for the approximate transformation
 		if ( similarOrientation == 2 )
 		{
