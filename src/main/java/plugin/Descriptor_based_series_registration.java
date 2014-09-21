@@ -568,7 +568,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		gdGauss.addNumericField( "Support_region_size_for_fit_Y [px]", defaultSupportY, 0 );
 
 		if ( dimensionality == 3 )
-		gdGauss.addNumericField( "Support_region_size_for_fit_Z [px]", defaultSupportZ, 0 );
+			gdGauss.addNumericField( "Support_region_size_for_fit_Z [px]", defaultSupportZ, 0 );
 
 		gdGauss.addMessage( "" );
 
@@ -590,7 +590,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		if ( dimensionality == 3 )
 			params.region[ 2 ] = defaultSupportZ = (int)Math.round( gdGauss.getNextNumber() );
 
-		params.iterations = defaultSupportX = (int)Math.round( gdGauss.getNextNumber() );
+		params.iterations = defaultIterations = (int)Math.round( gdGauss.getNextNumber() );
 
 		return true;
 	}
