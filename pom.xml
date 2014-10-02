@@ -19,14 +19,6 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>gov.nist.math</groupId>
-			<artifactId>jama</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>sc.fiji</groupId>
-			<artifactId>VIB-lib</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>fiji-lib</artifactId>
 		</dependency>
@@ -64,10 +56,6 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>SPIM_Registration</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>sc.fiji</groupId>
-			<artifactId>Stitching_</artifactId>
 		</dependency>
 	</dependencies>
 
