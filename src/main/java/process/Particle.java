@@ -1,12 +1,10 @@
 package process;
 
-import ij.IJ;
+import fiji.util.node.Leaf;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
-import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.imglib.util.Util;
 import mpicbg.models.Point;
-import fiji.util.node.Leaf;
 
 public class Particle extends Point implements Leaf<Particle>
 {

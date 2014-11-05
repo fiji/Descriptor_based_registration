@@ -18,7 +18,6 @@ import mpicbg.models.AffineModel3D;
 import mpicbg.models.HomographyModel2D;
 import mpicbg.models.InterpolatedAffineModel2D;
 import mpicbg.models.InterpolatedAffineModel3D;
-import mpicbg.models.InterpolatedModel;
 import mpicbg.models.InvertibleBoundable;
 import mpicbg.models.RigidModel2D;
 import mpicbg.models.RigidModel3D;

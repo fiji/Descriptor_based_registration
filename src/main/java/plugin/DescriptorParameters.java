@@ -1,8 +1,9 @@
 package plugin;
 
+import ij.gui.Roi;
+
 import java.util.ArrayList;
 
-import ij.gui.Roi;
 import mpicbg.models.AbstractModel;
 import mpicbg.models.InvertibleBoundable;
 import mpicbg.models.PointMatch;

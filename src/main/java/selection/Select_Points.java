@@ -1,5 +1,8 @@
 package selection;
 
+import fiji.tool.AbstractTrackingTool;
+import fiji.tool.ToolToggleListener;
+import fiji.tool.ToolWithOptions;
 import ij.ImagePlus;
 import ij.gui.Line;
 import ij.gui.OvalRoi;
@@ -20,9 +23,6 @@ import java.util.ArrayList;
 
 import mpicbg.imglib.util.Util;
 import mpicbg.models.Point;
-import fiji.tool.AbstractTrackingTool;
-import fiji.tool.ToolToggleListener;
-import fiji.tool.ToolWithOptions;
 
 /**
  * This is a template for a generic tool using Fiji's AbstractTool infrastructure.
