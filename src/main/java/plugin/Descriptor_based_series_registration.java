@@ -138,11 +138,33 @@ public class Descriptor_based_series_registration implements PlugIn
 			{
 				IJ.log( "WARNING: applying " + lastModels.get( 0 ).getClass().getSimpleName() + " to " + dimensionality + " data." );
 			}
+
+			final GenericDialog gd2 = new GenericDialog( "Descriptor based stack registration" );
+			gd2.addChoice( "Image fusion", resultChoices, resultChoices[ defaultResult ] );
+
+			if ( gd2.wasCanceled() )
+				return;
+
+			final int result = defaultResult = gd.getNextChoiceIndex();
+
+			if ( defaultResult == 1 )
+			{
+				final GenericDialogPlus gd3 = new GenericDialogPlus( "Select output directory" );
+				gd3.addDirectoryField( "Output_directory", defaultDirectory, 60 );
+				gd3.showDialog();
+				
+				if ( gd3.wasCanceled() )
+					return;
+				
+				defaultDirectory = gd3.getNextString();
+			}
 			
 			// just fuse
 			final DescriptorParameters params = new DescriptorParameters();
 			params.reApply = true;
 			params.dimensionality = dimensionality;
+			params.fuse = result;
+			params.directory = defaultDirectory;
 			Matching.descriptorBasedStackRegistration( imp, params );
 			return;
 		}
