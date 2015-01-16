@@ -145,7 +145,7 @@ public class Descriptor_based_series_registration implements PlugIn
 			if ( gd2.wasCanceled() )
 				return;
 
-			final int result = defaultResult = gd.getNextChoiceIndex();
+			final int result = defaultResult = gd2.getNextChoiceIndex();
 
 			if ( defaultResult == 1 )
 			{
