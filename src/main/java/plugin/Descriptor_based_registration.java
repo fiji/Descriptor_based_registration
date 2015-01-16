@@ -447,7 +447,10 @@ public class Descriptor_based_registration implements PlugIn
 			// query parameters interactively
 			final double[] values = new double[]{ defaultSigma, defaultThreshold };
 			final InteractiveDoG idog = getInteractiveDoGParameters( imp1, channel1, values, 20 );
-			
+
+			if ( idog.wasCanceled() )
+				return null;
+
 			params.sigma1 = values[ 0 ];
 			params.threshold = values[ 1 ];
 			params.lookForMaxima = idog.getLookForMaxima();

@@ -142,6 +142,7 @@ public class Descriptor_based_series_registration implements PlugIn
 			final GenericDialog gd2 = new GenericDialog( "Descriptor based stack registration" );
 			gd2.addChoice( "Image fusion", resultChoices, resultChoices[ defaultResult ] );
 
+			gd2.showDialog();
 			if ( gd2.wasCanceled() )
 				return;
 
@@ -478,7 +479,10 @@ public class Descriptor_based_series_registration implements PlugIn
 			interactiveTmp.show();
 			final InteractiveDoG idog = Descriptor_based_registration.getInteractiveDoGParameters( interactiveTmp, 1, values, 20 );
 			interactiveTmp.close();
-			
+
+			if ( idog.wasCanceled() )
+				return null;
+
 			params.sigma1 = values[ 0 ];
 			params.threshold = values[ 1 ];
 			params.lookForMaxima = idog.getLookForMaxima();
