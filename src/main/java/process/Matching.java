@@ -287,7 +287,7 @@ public class Matching
 					IJ.log( "\nNumber of matches " + numMatches );
 				
 				// iterate until it converges
-				for ( int iteration = 0; iteration < 5; ++iteration )
+				for ( int iteration = 0; iteration < params.maxIterations; ++iteration )
 				{
 					if ( !params.silent )
 						IJ.log( "\nIteration " + (iteration+1) );

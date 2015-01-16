@@ -22,7 +22,12 @@ public class DescriptorParameters
 	 * candidates in RANSAC
 	 */
 	public static float minInlierRatio = 0.05f;
-	
+
+	/**
+	 * if there is a ROI designed, how many iterations
+	 */
+	public static int maxIterations = 5;
+
 	/**
 	 * Max trust: reject candidates with a cost 
 	 * larger than maxTrust * median cost 
