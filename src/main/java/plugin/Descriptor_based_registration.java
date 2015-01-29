@@ -237,8 +237,7 @@ public class Descriptor_based_registration implements PlugIn
 		gd.addChoice( "Brightness_of detections", detectionBrightness, detectionBrightness[ defaultDetectionBrightness ] );
 		gd.addChoice( "Approximate_size of detections", detectionSize, detectionSize[ defaultDetectionSize ] );
 		gd.addChoice( "Type_of_detections", detectionTypes, detectionTypes[ defaultDetectionType ] );
-		gd.addChoice( "Subpixel_Localization", Descriptor_based_series_registration.localizationChoice, Descriptor_based_series_registration.localizationChoice[ Descriptor_based_series_registration.defaultLocalization ] );
-
+		
 		gd.addChoice( "Transformation_model", transformationModel, transformationModel[ defaultTransformationModel ] );
 		gd.addCheckbox( "Regularize_model", defaultRegularize );
 		gd.addChoice( "Images_pre-alignemnt", orientation, orientation[ defaultSimilarOrientation ] );
@@ -294,8 +293,6 @@ public class Descriptor_based_registration implements PlugIn
 		final int detectionBrightnessIndex = gd.getNextChoiceIndex();
 		final int detectionSizeIndex = gd.getNextChoiceIndex();
 		final int detectionTypeIndex = gd.getNextChoiceIndex();
-		final int localization = gd.getNextChoiceIndex();
-
 		final int transformationModelIndex = gd.getNextChoiceIndex();
 		final boolean regularize = gd.getNextBoolean();
 		final int similarOrientation = gd.getNextChoiceIndex();
@@ -314,7 +311,6 @@ public class Descriptor_based_registration implements PlugIn
 		defaultDetectionBrightness = detectionBrightnessIndex;
 		defaultDetectionSize = detectionSizeIndex;
 		defaultDetectionType = detectionTypeIndex;
-		Descriptor_based_series_registration.defaultLocalization = localization;
 		defaultTransformationModel = transformationModelIndex;
 		defaultRegularize = regularize;
 		defaultSimilarOrientation = similarOrientation;
@@ -532,8 +528,7 @@ public class Descriptor_based_registration implements PlugIn
 		else
 			params.fuse = 2;
 		params.setPointsRois = addPointRoi;
-		params.localization = localization;
-
+		
 		// ask for the approximate transformation
 		if ( similarOrientation == 2 )
 		{
@@ -766,17 +761,14 @@ public class Descriptor_based_registration implements PlugIn
 				final SimilarityModel2D model = new SimilarityModel2D();
 				model.set( (float)( defaultScale*Math.cos( Math.toRadians( defaultDegrees1 ) ) ), (float)( defaultScale * Math.sin( Math.toRadians( defaultDegrees1 ) ) ), 0, 0 );
 				params.initialModel = model;
-			}
+			}			
 			else
 			{
 				IJ.log( "Unfortunately this is not supported this model yet ... " );
 				return null;
-			}
+			}					
 		}
-
-		if ( localization == 2 && !Descriptor_based_series_registration.getGaussianParameters( dimensionality, params ) )
-			return null;
-
+		
 		return params;
 	}
 	

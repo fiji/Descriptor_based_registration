@@ -49,6 +49,7 @@ import mpicbg.pointdescriptor.similarity.SimilarityMeasure;
 import mpicbg.pointdescriptor.similarity.SquareDistance;
 import mpicbg.spim.registration.ViewStructure;
 import mpicbg.spim.registration.bead.BeadRegistration;
+import mpicbg.spim.registration.detection.DetectionSegmentation;
 import mpicbg.spim.segmentation.InteractiveDoG;
 import plugin.DescriptorParameters;
 import plugin.Descriptor_based_registration;
@@ -821,8 +822,7 @@ public class Matching
 			img.setCalibration( new float[]{ (float)cal.pixelWidth, (float)cal.pixelHeight, (float)cal.pixelDepth } );
 		
 		// extract candidates
-		final ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks = computeDoG( img, (float)params.sigma1, (float)params.sigma2, params.lookForMaxima, params.lookForMinima, (float)params.threshold,
-				params.localization, params.iterations, params.sigma, params.region );
+		final ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks = computeDoG( img, (float)params.sigma1, (float)params.sigma2, params.lookForMaxima, params.lookForMinima, (float)params.threshold );
 		
 		// remove invalid peaks
 		final int[] stats1 = removeInvalidAndCollectStatistics( peaks );
@@ -1150,11 +1150,9 @@ public class Matching
 	}
 	
 	protected static ArrayList<DifferenceOfGaussianPeak<FloatType>> computeDoG( final Image<FloatType> image, final float sigma1, final float sigma2, 
-			final boolean lookForMaxima, final boolean lookForMinima, final float threshold, final int localization, 
-			final int iterations, final double[] sigmaGuess, final int[] region ) // gaussian fit parameters
+			final boolean lookForMaxima, final boolean lookForMinima, final float threshold )
 	{
-		return DetectionSegmentation.extractBeadsLaPlaceImgLib( image, new OutOfBoundsStrategyMirrorFactory<FloatType>(), 0.5f, sigma1, sigma2, threshold, threshold/4, lookForMaxima, lookForMinima, 
-				localization, iterations, sigmaGuess, region, ViewStructure.DEBUG_MAIN );
+		return DetectionSegmentation.extractBeadsLaPlaceImgLib( image, new OutOfBoundsStrategyMirrorFactory<FloatType>(), 0.5f, sigma1, sigma2, threshold, threshold/4, lookForMaxima, lookForMinima, ViewStructure.DEBUG_MAIN );
 	}
 
 	private static PrintWriter openFileWrite(final File file)
