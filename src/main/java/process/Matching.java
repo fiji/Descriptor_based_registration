@@ -639,7 +639,7 @@ public class Matching
 				identityTransform = new TranslationModel3D();
 			*/
 			
-			candidates = getCorrespondenceCandidates( params.significance, matcher, peaks1, peaks2, identityTransform, params.dimensionality, zStretching1, zStretching2 );
+			candidates = getCorrespondenceCandidates( params.significance, matcher, peaks1, peaks2, identityTransform, params.dimensionality, zStretching1, zStretching2, explanation );
 
 			// before we compute the RANSAC we will reset the coordinates of all points so that we directly get the correct model
 			for ( final PointMatch pm : candidates )
@@ -649,7 +649,7 @@ public class Matching
 			}
 		}
 		else
-			candidates = getCorrespondenceCandidates( params.significance, matcher, peaks1, peaks2, null, params.dimensionality, zStretching1, zStretching2 );
+			candidates = getCorrespondenceCandidates( params.significance, matcher, peaks1, peaks2, null, params.dimensionality, zStretching1, zStretching2, explanation );
 		
 		// compute ransac
 		//ArrayList<PointMatch> finalInliers = new ArrayList<PointMatch>();
@@ -701,7 +701,7 @@ public class Matching
 			do
 			{
 				// get the correspondence candidates with the knowledge of the previous model
-				candidates = getCorrespondenceCandidates( params.significance, matcher, peaks1, peaks2, finalModel, params.dimensionality, zStretching1, zStretching2 );
+				candidates = getCorrespondenceCandidates( params.significance, matcher, peaks1, peaks2, finalModel, params.dimensionality, zStretching1, zStretching2, explanation );
 				
 				// before we compute the RANSAC we will reset the coordinates of all points so that we directly get the correct model
 				for ( final PointMatch pm : candidates )
@@ -828,16 +828,12 @@ public class Matching
 		
 		// remove invalid peaks
 		final int[] stats1 = removeInvalidAndCollectStatistics( peaks );
-		
-		if ( !params.silent )
-			IJ.log( "Found " + peaks.size() + " candidates for " + imp.getTitle() + " [" + timepoint + "] (" + stats1[ 1 ] + " maxima, " + stats1[ 0 ] + " minima)" );
+
+		String statement = "Found " + peaks.size() + " candidates for " + imp.getTitle() + " [" + timepoint + "] (" + stats1[ 1 ] + " maxima, " + stats1[ 0 ] + " minima)";
 
 		// filter strongest detections
 		if ( DescriptorParameters.brightestNPoints > 0 )
 		{
-			if ( !params.silent )
-				IJ.log( "Just keeping the " + DescriptorParameters.brightestNPoints + " strongest detections for matching." );
-
 			final ArrayList< PeakSort > sortList = new ArrayList< PeakSort >();
 
 			for ( final DifferenceOfGaussianPeak< FloatType > peak : peaks )
@@ -848,7 +844,12 @@ public class Matching
 			peaks.clear();
 			for ( int i = sortList.size() - 1; i >= sortList.size() - DescriptorParameters.brightestNPoints && i >= 0; --i )
 				peaks.add( sortList.get( i ).peak );
+
+			statement += ", kept brightest " + peaks.size() + " peaks for matching.";
 		}
+
+		if ( !params.silent )
+			IJ.log( statement );
 
 		return peaks;
 	}
@@ -986,12 +987,15 @@ public class Matching
 
 	protected static ArrayList<PointMatch> getCorrespondenceCandidates( final double nTimesBetter, final Matcher matcher, 
 			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks1, ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks2, 
-			final Model<?> model, final int dimensionality, final float zStretching1, final float zStretching2 )
+			final Model<?> model, final int dimensionality, final float zStretching1, final float zStretching2, String explanation )
 	{
 		// test if there are enough points for the matcher
 		if ( peaks1.size() < matcher.getRequiredNumNeighbors() || peaks2.size() < matcher.getRequiredNumNeighbors() )
+		{
+			IJ.log( explanation + ": Not enough peaks to perform a matching (at least " + matcher.getRequiredNumNeighbors() + " are required to build a descriptor)." );
 			return new ArrayList<PointMatch>();
-		
+		}
+
 		// two new lists
 		ArrayList<Particle> listA = new ArrayList<Particle>();
 		ArrayList<Particle> listB = new ArrayList<Particle>();
