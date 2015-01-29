@@ -59,12 +59,13 @@ public class DescriptorParameters
 	 * Writes out all corresponding points of all pairs if this is set to a directory
 	 */
 	public static String correspondenceDirectory = null;
-	
+
 	// for debug
 	public static boolean printAllSimilarities = false;
 
 	public int dimensionality;
 	public double sigma1, sigma2, threshold;
+	public int localization = 1; //localizationChoice = { "None", "3-dimensional quadratic fit", "Gaussian mask localization fit" };
 	public boolean lookForMaxima, lookForMinima;
 	public AbstractModel<?> model;
 	public boolean similarOrientation;
@@ -113,4 +114,9 @@ public class DescriptorParameters
 	public ArrayList<PointMatch> inliers = null;
 	public InvertibleBoundable model1 = null;
 	public InvertibleBoundable model2 = null;
+
+	// gaussian parameters
+	public double[] sigma;
+	public int[] region;
+	public int iterations;
 }
