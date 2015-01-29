@@ -60,6 +60,11 @@ public class DescriptorParameters
 	 */
 	public static String correspondenceDirectory = null;
 
+	/**
+	 * Just keep the brightest N points of all detections
+	 */
+	public static int brightestNPoints = 0;
+
 	// for debug
 	public static boolean printAllSimilarities = false;
 

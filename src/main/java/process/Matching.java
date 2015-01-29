@@ -14,7 +14,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -829,10 +831,49 @@ public class Matching
 		
 		if ( !params.silent )
 			IJ.log( "Found " + peaks.size() + " candidates for " + imp.getTitle() + " [" + timepoint + "] (" + stats1[ 1 ] + " maxima, " + stats1[ 0 ] + " minima)" );
-		
+
+		// filter strongest detections
+		if ( DescriptorParameters.brightestNPoints > 0 )
+		{
+			if ( !params.silent )
+				IJ.log( "Just keeping the " + DescriptorParameters.brightestNPoints + " strongest detections for matching." );
+
+			final ArrayList< PeakSort > sortList = new ArrayList< PeakSort >();
+
+			for ( final DifferenceOfGaussianPeak< FloatType > peak : peaks )
+				sortList.add( new PeakSort( peak ) );
+
+			Collections.sort( sortList );
+
+			peaks.clear();
+			for ( int i = sortList.size() - 1; i >= sortList.size() - DescriptorParameters.brightestNPoints && i >= 0; --i )
+				peaks.add( sortList.get( i ).peak );
+		}
+
 		return peaks;
 	}
-	
+
+	public static class PeakSort implements Comparable< PeakSort >
+	{
+		final DifferenceOfGaussianPeak< FloatType > peak;
+
+		public PeakSort( final DifferenceOfGaussianPeak< FloatType > peak ) { this.peak = peak; }
+
+		@Override
+		public int compareTo( final PeakSort o)
+		{
+			final float diff = Math.abs( peak.getValue().get() ) - Math.abs( o.peak.getValue().get() );
+
+			if ( diff < 0 )
+				return -1;
+			else if ( diff > 0 )
+				return 1;
+			else
+				return 0;
+		}
+		
+	}
+
 	protected static ArrayList<DifferenceOfGaussianPeak<FloatType>> filterForROI( final Roi roi, final ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks )
 	{
 		if ( roi == null )
@@ -1192,5 +1233,4 @@ public class Matching
         
         return new int[]{ min, max };
 	}
-
 }
