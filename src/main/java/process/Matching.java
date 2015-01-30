@@ -8,6 +8,10 @@ import ij.ImagePlus;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
 import ij.measure.Calibration;
+import ij.process.ByteProcessor;
+import ij.process.FloatProcessor;
+import ij.process.ImageProcessor;
+import ij.process.ShortProcessor;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -22,7 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussian.SpecialPoint;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
+import mpicbg.imglib.container.array.ArrayContainerFactory;
+import mpicbg.imglib.cursor.LocalizableCursor;
+import mpicbg.imglib.cursor.array.ArrayCursor;
 import mpicbg.imglib.image.Image;
+import mpicbg.imglib.image.ImageFactory;
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.imglib.outofbounds.OutOfBoundsStrategyMirrorFactory;
 import mpicbg.imglib.type.numeric.integer.UnsignedByteType;
@@ -49,6 +57,7 @@ import mpicbg.pointdescriptor.model.TranslationInvariantRigidModel2D;
 import mpicbg.pointdescriptor.model.TranslationInvariantRigidModel3D;
 import mpicbg.pointdescriptor.similarity.SimilarityMeasure;
 import mpicbg.pointdescriptor.similarity.SquareDistance;
+import mpicbg.spim.registration.ViewDataBeads;
 import mpicbg.spim.registration.ViewStructure;
 import mpicbg.spim.registration.bead.BeadRegistration;
 import mpicbg.spim.segmentation.InteractiveDoG;
@@ -812,7 +821,7 @@ public class Matching
 	public static ArrayList<DifferenceOfGaussianPeak<FloatType>> extractCandidates( final ImagePlus imp, final int channel, final int timepoint, final DescriptorParameters params )
 	{
 		// get the input images for registration
-		final Image<FloatType> img = InteractiveDoG.convertToFloat( imp, channel, timepoint );
+		final Image<FloatType> img = convertToFloat( imp, channel, timepoint );
 		
 		// extract Calibrations
 		final Calibration cal = imp.getCalibration();
@@ -873,6 +882,122 @@ public class Matching
 				return 0;
 		}
 		
+	}
+
+	/**
+	 * Normalize and make a copy of the {@link ImagePlus} into an {@link Image}<FloatType> for faster access when copying the slices
+	 * 
+	 * @param imp - the {@link ImagePlus} input image
+	 * @return - the normalized copy [0...1]
+	 */
+	public static Image<FloatType> convertToFloat( final ImagePlus imp, int channel, int timepoint )
+	{
+		// stupid 1-offset of imagej
+		channel++;
+		timepoint++;
+		
+		final Image<FloatType> img;
+		
+		if ( imp.getNSlices() > 1 )
+			img = new ImageFactory<FloatType>( new FloatType(), new ArrayContainerFactory() ).createImage( new int[]{ imp.getWidth(), imp.getHeight(), imp.getNSlices() } );
+		else
+			img = new ImageFactory<FloatType>( new FloatType(), new ArrayContainerFactory() ).createImage( new int[]{ imp.getWidth(), imp.getHeight() } );
+		
+		final int sliceSize = imp.getWidth() * imp.getHeight();
+		
+		int z = 0;
+		ImageProcessor ip = imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, timepoint ) );
+		
+		if ( ip instanceof FloatProcessor )
+		{
+			final ArrayCursor<FloatType> cursor = (ArrayCursor<FloatType>)img.createCursor();
+			
+			float[] pixels = (float[])ip.getPixels();
+			int i = 0;
+			
+			while ( cursor.hasNext() )
+			{
+				// only get new imageprocessor if necessary
+				if ( i == sliceSize )
+				{
+					++z;
+					
+					pixels = (float[])imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, timepoint ) ).getPixels();
+						 
+					i = 0;
+				}
+				
+				cursor.next().set( pixels[ i++ ] );
+			}
+		}
+		else if ( ip instanceof ByteProcessor )
+		{
+			final ArrayCursor<FloatType> cursor = (ArrayCursor<FloatType>)img.createCursor();
+
+			byte[] pixels = (byte[])ip.getPixels();
+			int i = 0;
+			
+			while ( cursor.hasNext() )
+			{
+				// only get new imageprocessor if necessary
+				if ( i == sliceSize )
+				{
+					++z;
+					pixels = (byte[])imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, timepoint ) ).getPixels();
+					
+					i = 0;
+				}
+				
+				cursor.next().set( pixels[ i++ ] & 0xff );
+			}
+		}
+		else if ( ip instanceof ShortProcessor )
+		{
+			final ArrayCursor<FloatType> cursor = (ArrayCursor<FloatType>)img.createCursor();
+
+			short[] pixels = (short[])ip.getPixels();
+			int i = 0;
+			
+			while ( cursor.hasNext() )
+			{
+				// only get new imageprocessor if necessary
+				if ( i == sliceSize )
+				{
+					++z;
+					
+					pixels = (short[])imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, timepoint ) ).getPixels();
+					
+					i = 0;
+				}
+				
+				cursor.next().set( pixels[ i++ ] & 0xffff );
+			}
+		}
+		else // some color stuff or so 
+		{
+			final LocalizableCursor<FloatType> cursor = img.createLocalizableCursor();
+			final int[] location = new int[ img.getNumDimensions() ];
+
+			while ( cursor.hasNext() )
+			{
+				cursor.fwd();
+				cursor.getPosition( location );
+				
+				// only get new imageprocessor if necessary
+				if ( location[ 2 ] != z )
+				{
+					z = location[ 2 ];
+					
+					ip = imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, timepoint ) );
+				}
+				
+				cursor.getType().set( ip.getPixelValue( location[ 0 ], location[ 1 ] ) );
+			}
+		}
+		
+		ViewDataBeads.normalizeImage( img );
+		
+		return img;
 	}
 
 	protected static ArrayList<DifferenceOfGaussianPeak<FloatType>> filterForROI( final Roi roi, final ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks )
