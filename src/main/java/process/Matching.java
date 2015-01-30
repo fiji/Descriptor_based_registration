@@ -990,7 +990,7 @@ public class Matching
 			final Model<?> model, final int dimensionality, final float zStretching1, final float zStretching2, String explanation )
 	{
 		// test if there are enough points for the matcher
-		if ( peaks1.size() < matcher.getRequiredNumNeighbors() || peaks2.size() < matcher.getRequiredNumNeighbors() )
+		if ( peaks1.size() <= matcher.getRequiredNumNeighbors() || peaks2.size() <= matcher.getRequiredNumNeighbors() )
 		{
 			IJ.log( explanation + ": Not enough peaks to perform a matching (at least " + matcher.getRequiredNumNeighbors() + " are required to build a descriptor)." );
 			return new ArrayList<PointMatch>();
