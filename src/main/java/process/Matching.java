@@ -20,7 +20,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -42,10 +41,12 @@ import mpicbg.models.InterpolatedAffineModel2D;
 import mpicbg.models.InterpolatedAffineModel3D;
 import mpicbg.models.InvertibleBoundable;
 import mpicbg.models.Model;
+import mpicbg.models.NotEnoughDataPointsException;
 import mpicbg.models.Point;
 import mpicbg.models.PointMatch;
 import mpicbg.models.Tile;
 import mpicbg.models.TileConfiguration;
+import mpicbg.models.TranslationModel2D;
 import mpicbg.pointdescriptor.AbstractPointDescriptor;
 import mpicbg.pointdescriptor.ModelPointDescriptor;
 import mpicbg.pointdescriptor.SimplePointDescriptor;
@@ -60,7 +61,6 @@ import mpicbg.pointdescriptor.similarity.SquareDistance;
 import mpicbg.spim.registration.ViewDataBeads;
 import mpicbg.spim.registration.ViewStructure;
 import mpicbg.spim.registration.bead.BeadRegistration;
-import mpicbg.spim.segmentation.InteractiveDoG;
 import plugin.DescriptorParameters;
 import plugin.Descriptor_based_registration;
 import plugin.Descriptor_based_series_registration;
@@ -68,7 +68,8 @@ import plugin.Descriptor_based_series_registration;
 public class Matching 
 {
 	public static boolean applyScaling = false;
-	public static float factor = 1f; 
+	public static float factor = 1f;
+	protected static PrintWriter outAll = null;
 	
 	/**
 	 * 
@@ -422,34 +423,49 @@ public class Matching
 		final Vector<ComparePair> pairs = getComparePairs( params, numImages );
 
 		// compute all matchings
-		final AtomicInteger ai = new AtomicInteger(0);					
-        final Thread[] threads = SimpleMultiThreading.newThreads();
-        final int numThreads = threads.length;
-    	
-        for ( int ithread = 0; ithread < threads.length; ++ithread )
-            threads[ ithread ] = new Thread(new Runnable()
-            {
-                public void run()
-                {		
-                   	final int myNumber = ai.getAndIncrement();
-                    
-                    for ( int i = 0; i < pairs.size(); i++ )
-                    	if ( i%numThreads == myNumber )
-                    	{
-                    		final ComparePair pair = pairs.get( i );
-                    		pair.model = pairwiseMatching( pair.inliers, peaks.get( pair.indexA ), peaks.get( pair.indexB ), zStretching, zStretching, params, pair.indexA + "<->" + pair.indexB );
-                    		                    		
-                    		if ( pair.model == null )
-                    		{
-                    			pair.inliers.clear();
-                    			pair.model = params.model.copy();
-                    		}
-                    	}
-                }
-            });
-        
-        SimpleMultiThreading.startAndJoin( threads );
-        
+		final AtomicInteger ai = new AtomicInteger(0);
+		final Thread[] threads = SimpleMultiThreading.newThreads();
+		final int numThreads = threads.length;
+
+		// open debug file if wanted
+		if ( DescriptorParameters.correspondenceDirectory != null )
+		{
+			final File dir = new File( DescriptorParameters.correspondenceDirectory );
+			
+			if ( dir.exists() && dir.isDirectory() )
+				outAll = openFileWrite( new File( DescriptorParameters.correspondenceDirectory, "_all.txt" ) );
+
+			if ( outAll == null )
+				IJ.log( "Could not open file to write all correspondences: " + new File( DescriptorParameters.correspondenceDirectory, "_all.txt" ));
+		}
+
+		for ( int ithread = 0; ithread < threads.length; ++ithread )
+		threads[ ithread ] = new Thread(new Runnable()
+		{
+			public void run()
+			{
+				final int myNumber = ai.getAndIncrement();
+				
+				for ( int i = 0; i < pairs.size(); i++ )
+					if ( i%numThreads == myNumber )
+					{
+						final ComparePair pair = pairs.get( i );
+						pair.model = pairwiseMatching( pair.inliers, peaks.get( pair.indexA ), peaks.get( pair.indexB ), zStretching, zStretching, params, pair.indexA + "<->" + pair.indexB );
+				
+						if ( pair.model == null )
+						{
+							pair.inliers.clear();
+							pair.model = params.model.copy();
+						}
+					}
+			}
+		});
+		
+		SimpleMultiThreading.startAndJoin( threads );
+
+		if ( outAll != null )
+			outAll.close();
+
 		return pairs;
 	}
 	
@@ -778,29 +794,21 @@ public class Matching
 				{
 					String ex2 = explanation.replaceAll( "<->", "-" );
 					final File file = new File( DescriptorParameters.correspondenceDirectory, ex2 + ".txt" );
+					
+					synchronized ( outAll )
+					{
+						writePoints( finalInliers, params, finalModel, outAll );
+					}
+					
 					final PrintWriter out = openFileWrite( file );
 					
 					if ( out == null )
 					{
-						IJ.log( "Could not create file: " + file );											
+						IJ.log( "Could not create file: " + file );
 					}
 					else
 					{
-						if  ( params.dimensionality == 3 )
-							out.println( "x0" + "\t" + "y0" + "\t" + "z0" + "\t" + "x1" + "\t" + "y1" + "\t" + "z1" );
-						else
-							out.println( "x0" + "\t" + "y0" + "\t" + "x1" + "\t" + "y1" );
-	
-						for ( final PointMatch pm : finalInliers )
-						{
-							Particle particleA = (Particle)pm.getP1();
-							Particle particleB = (Particle)pm.getP2();
-							
-							if  ( params.dimensionality == 3 )
-								out.println( particleA.getL()[ 0 ] + "\t" + particleA.getL()[ 1 ] + "\t" + particleA.getL()[ 2 ]/particleA.zStretching + "\t" + particleB.getL()[ 0 ] + "\t" + particleB.getL()[ 1 ] + "\t" + particleB.getL()[ 2 ]/particleB.zStretching );
-							else
-								out.println( particleA.getL()[ 0 ] + "\t" + particleA.getL()[ 1 ] + "\t" + particleB.getL()[ 0 ] + "\t" + particleB.getL()[ 1 ] );
-						}					
+						writePoints( finalInliers, params, finalModel, out );
 						out.close();
 					}
 				}
@@ -818,10 +826,65 @@ public class Matching
 		return finalModel;
 	}
 
+	protected static void writePoints( final ArrayList<PointMatch> finalInliers, final DescriptorParameters params, final Model<?> finalModel, final PrintWriter out )
+	{
+		for ( final PointMatch pm : finalInliers )
+		{
+			Particle particleA = (Particle)pm.getP1();
+			Particle particleB = (Particle)pm.getP2();
+			
+			particleA.apply( finalModel );
+
+			if  ( params.dimensionality == 3 )
+				out.println( particleA.getW()[ 0 ] + "\t" + particleA.getW()[ 1 ] + "\t" + particleA.getW()[ 2 ]/particleA.zStretching + "\t" + particleB.getW()[ 0 ] + "\t" + particleB.getW()[ 1 ] + "\t" + particleB.getW()[ 2 ]/particleB.zStretching );
+			else
+				out.println( particleA.getW()[ 0 ] + "\t" + particleA.getW()[ 1 ] + "\t" + particleB.getW()[ 0 ] + "\t" + particleB.getW()[ 1 ] );
+		}		
+	}
+
+	public static float[] computeMinMax( final ImagePlus imp, final int channel )
+	{
+		final int size = imp.getWidth() * imp.getHeight();
+		float min = Float.MAX_VALUE;
+		float max = -Float.MAX_VALUE;
+
+		IJ.log( "Computing min/max over " + imp.getNSlices() + " slices and " + imp.getNFrames() + " frames for channel " + channel );
+
+		for ( int z = 0; z < imp.getNSlices(); ++z )
+			for ( int t = 0; t < imp.getNFrames(); ++t )
+			{
+				final ImageProcessor ip = imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, t + 1 ) );
+
+				for ( int i = 0; i < size; ++i )
+				{
+					final float f = ip.getf( i );
+					min = Math.min( min, f );
+					max = Math.max( max, f );
+				}
+			}
+
+		return new float[]{ min, max };
+	}
+	
 	public static ArrayList<DifferenceOfGaussianPeak<FloatType>> extractCandidates( final ImagePlus imp, final int channel, final int timepoint, final DescriptorParameters params )
 	{
+		float[] minmax;
+
+		if ( DescriptorParameters.minMaxType == 0 )
+			minmax = null;
+		else if ( DescriptorParameters.minMaxType == 1 )
+			minmax = computeMinMax( imp, channel );
+		else
+			minmax = new float[]{ (float)DescriptorParameters.min, (float)DescriptorParameters.max };
+
+		if ( minmax != null )
+		{
+			IJ.log( "min=" + minmax[ 0 ] );
+			IJ.log( "max=" + minmax[ 1 ] );
+		}
+		
 		// get the input images for registration
-		final Image<FloatType> img = convertToFloat( imp, channel, timepoint );
+		final Image<FloatType> img = convertToFloat( imp, channel, timepoint, minmax );
 		
 		// extract Calibrations
 		final Calibration cal = imp.getCalibration();
@@ -890,7 +953,7 @@ public class Matching
 	 * @param imp - the {@link ImagePlus} input image
 	 * @return - the normalized copy [0...1]
 	 */
-	public static Image<FloatType> convertToFloat( final ImagePlus imp, int channel, int timepoint )
+	public static Image<FloatType> convertToFloat( final ImagePlus imp, int channel, int timepoint, final float[] minmax )
 	{
 		// stupid 1-offset of imagej
 		channel++;
@@ -994,9 +1057,9 @@ public class Matching
 				cursor.getType().set( ip.getPixelValue( location[ 0 ], location[ 1 ] ) );
 			}
 		}
-		
-		ViewDataBeads.normalizeImage( img );
-		
+
+		ViewDataBeads.normalizeImage( img, minmax );
+
 		return img;
 	}
 
@@ -1361,5 +1424,28 @@ public class Matching
         }
         
         return new int[]{ min, max };
+	}
+
+	public static void main( String[] args ) throws NotEnoughDataPointsException
+	{
+		Point p1 = new Point( new float[]{ 10, 20 } );
+		Point p2 = new Point( new float[]{ 100, 200 } );
+		
+		TranslationModel2D m = new TranslationModel2D();
+		
+		ArrayList< PointMatch > list = new ArrayList< PointMatch >();
+		
+		list.add( new PointMatch( p1, p2 ) );
+		
+		m.fit( list );
+		
+		System.out.println( m );
+		p1.apply( m );
+
+		System.out.println( Util.printCoordinates( p1.getL() ) );
+		System.out.println( Util.printCoordinates( p1.getW() ) );
+
+		System.out.println( Util.printCoordinates( p2.getL() ) );
+		System.out.println( Util.printCoordinates( p2.getW() ) );
 	}
 }

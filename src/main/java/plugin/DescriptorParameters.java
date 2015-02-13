@@ -65,6 +65,15 @@ public class DescriptorParameters
 	 */
 	public static int brightestNPoints = 0;
 
+	/**
+	 * 0 == compute per image (per timepoint/channel individually)
+	 * 1 == compute global min/max
+	 * 2 == define min/max
+	 */
+	public static int minMaxType = 0;
+	public static double min = 0;
+	public static double max = 0;
+
 	// for debug
 	public static boolean printAllSimilarities = false;
 
