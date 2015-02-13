@@ -92,8 +92,8 @@ public class Matching
 		if ( !params.reApply )
 		{
 			// get the peaks
-			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks1 = extractCandidates( imp1, params.channel1, 0, params );
-			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks2 = extractCandidates( imp2, params.channel2, 0, params );
+			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks1 = extractCandidates( imp1, params.channel1, 0, params, null );
+			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks2 = extractCandidates( imp2, params.channel2, 0, params, null );
 	
 			// filter for ROI
 			final int size1 = peaks1.size();
@@ -210,7 +210,7 @@ public class Matching
 		return numInliers;
 	}
 	
-	public static void descriptorBasedStackRegistration( final ImagePlus imp, final DescriptorParameters params )
+	public static ArrayList<InvertibleBoundable> descriptorBasedStackRegistration( final ImagePlus imp, final DescriptorParameters params )
 	{
 		final ArrayList<InvertibleBoundable> models;
 		
@@ -223,9 +223,24 @@ public class Matching
 		{
 			// get the peaks
 			final ArrayList<ArrayList<DifferenceOfGaussianPeak<FloatType>>> peaksComplete = new ArrayList<ArrayList<DifferenceOfGaussianPeak<FloatType>>>();
-			
+
+			float[] minmax;
+
+			if ( DescriptorParameters.minMaxType == 0 )
+				minmax = null;
+			else if ( DescriptorParameters.minMaxType == 1 )
+				minmax = computeMinMax( imp, params.channel1 );
+			else
+				minmax = new float[]{ (float)DescriptorParameters.min, (float)DescriptorParameters.max };
+
+			if ( minmax != null )
+			{
+				IJ.log( "min=" + minmax[ 0 ] );
+				IJ.log( "max=" + minmax[ 1 ] );
+			}
+
 			for ( int t = 0; t < numImages; ++t )
-				peaksComplete.add( extractCandidates( imp, params.channel1, t, params ) );
+				peaksComplete.add( extractCandidates( imp, params.channel1, t, params, minmax ) );
 
 			// filter for roi
 			final ArrayList<ArrayList<DifferenceOfGaussianPeak<FloatType>>> peaks = new ArrayList<ArrayList<DifferenceOfGaussianPeak<FloatType>>>();
@@ -287,7 +302,7 @@ public class Matching
 	        models = globalOptimization( pairs, numImages, params );
 	        
 	        if ( models == null )
-	        	return;
+	        	return null;
 	        
 			// we are done if no roi was selected, otherwise we have to update the roi with the new transformations
 			if ( params.roi1 != null )
@@ -371,6 +386,8 @@ public class Matching
 			if ( !params.silent )
 				IJ.log( "Finished" );
 		}
+
+		return models;
 	}
 	
 	/**
@@ -866,23 +883,8 @@ public class Matching
 		return new float[]{ min, max };
 	}
 	
-	public static ArrayList<DifferenceOfGaussianPeak<FloatType>> extractCandidates( final ImagePlus imp, final int channel, final int timepoint, final DescriptorParameters params )
+	public static ArrayList<DifferenceOfGaussianPeak<FloatType>> extractCandidates( final ImagePlus imp, final int channel, final int timepoint, final DescriptorParameters params, final float[] minmax )
 	{
-		float[] minmax;
-
-		if ( DescriptorParameters.minMaxType == 0 )
-			minmax = null;
-		else if ( DescriptorParameters.minMaxType == 1 )
-			minmax = computeMinMax( imp, channel );
-		else
-			minmax = new float[]{ (float)DescriptorParameters.min, (float)DescriptorParameters.max };
-
-		if ( minmax != null )
-		{
-			IJ.log( "min=" + minmax[ 0 ] );
-			IJ.log( "max=" + minmax[ 1 ] );
-		}
-		
 		// get the input images for registration
 		final Image<FloatType> img = convertToFloat( imp, channel, timepoint, minmax );
 		
