@@ -88,6 +88,11 @@
 			<artifactId>vecmath</artifactId>
 			<scope>provided</scope>
 		</dependency>
+		<dependency>
+			<groupId>sc.fiji</groupId>
+			<artifactId>legacy-imglib1</artifactId>
+			<version>1.1.0-DEPRECATED</version>
+		</dependency>
 	</dependencies>
 
 </project>
