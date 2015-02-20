@@ -1,9 +1,9 @@
 package process;
 
+import net.imglib2.util.Util;
 import fiji.util.node.Leaf;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
 import mpicbg.imglib.type.numeric.real.FloatType;
-import mpicbg.imglib.util.Util;
 import mpicbg.models.Point;
 
 public class Particle extends Point implements Leaf<Particle>
@@ -14,19 +14,28 @@ public class Particle extends Point implements Leaf<Particle>
 	
 	protected DifferenceOfGaussianPeak<FloatType> peak;
 	protected double weight = 1;
-	protected float distance = -1;
+	protected double distance = -1;
 	float diameter = 1;
 	float zStretching = 1;
 
-	public Particle( final int id, final DifferenceOfGaussianPeak<FloatType> peak, final float zStretching ) 
+	public Particle( final int id, final DifferenceOfGaussianPeak<FloatType> peak, final float zStretching )
 	{
-		super( peak.getSubPixelPosition() );
+		super( getSubPixelPosition( peak ) );
 		this.id = id;
 		this.peak = peak;
 		this.zStretching = zStretching;
 		
 		// init
 		restoreCoordinates();
+	}
+
+	private final static double[] getSubPixelPosition( final DifferenceOfGaussianPeak<FloatType> peak )
+	{
+		final int n = peak.getNumDimensions();
+		final double[] p = new double[ n ];
+		for ( int d = 0; d < n; ++d )
+			p[ d ] = peak.getSubPixelPosition( d );
+		return p;
 	}
 
 	public DifferenceOfGaussianPeak<FloatType> getPeak() { return peak; }
@@ -71,17 +80,17 @@ public class Particle extends Point implements Leaf<Particle>
 	public void setUseW( final boolean useW ) { this.useW = useW; } 
 	public boolean getUseW() { return useW; } 
 	
-	public void setDistance( float distance ) { this.distance = distance;	}
-	public float getDistance() { return this.distance;	}
+	public void setDistance( double distance ) { this.distance = distance;	}
+	public double getDistance() { return this.distance;	}
 
 
 	@Override
 	public float get( final int k ) 
 	{
 		if ( useW )
-			return w[ k ];
+			return (float)w[ k ];
 		else
-			return l[ k ];
+			return (float)l[ k ];
 	}	
 	
 	public void set( final float v, final int k ) 

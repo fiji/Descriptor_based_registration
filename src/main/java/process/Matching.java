@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import net.imglib2.util.Util;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussian.SpecialPoint;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
 import mpicbg.imglib.container.array.ArrayContainerFactory;
@@ -35,7 +36,6 @@ import mpicbg.imglib.outofbounds.OutOfBoundsStrategyMirrorFactory;
 import mpicbg.imglib.type.numeric.integer.UnsignedByteType;
 import mpicbg.imglib.type.numeric.integer.UnsignedShortType;
 import mpicbg.imglib.type.numeric.real.FloatType;
-import mpicbg.imglib.util.Util;
 import mpicbg.models.AbstractAffineModel3D;
 import mpicbg.models.InterpolatedAffineModel2D;
 import mpicbg.models.InterpolatedAffineModel3D;
@@ -1095,17 +1095,18 @@ public class Matching
 			
 			// init a temporary point that we will transform
 			final int numDimensions = peaks.get( 0 ).getSubPixelPosition().length;
-			final float[] tmp = new float[ numDimensions ];
+			final double[] tmp = new double[ numDimensions ];
 			
 			for ( final DifferenceOfGaussianPeak<FloatType> peak : peaks )
 			{
 				// update tmp
-				peak.getSubPixelPosition( tmp );
+				for ( int d = 0; d < numDimensions; ++d )
+					tmp[ d ] = peak.getSubPixelPosition( d );
 				
 				// apply the model
 				model.applyInPlace( tmp );
 				
-				if ( roi.contains( Math.round( tmp[ 0 ] ), Math.round( tmp[ 1 ] ) ) )
+				if ( roi.contains( (int)Math.round( tmp[ 0 ] ), (int)Math.round( tmp[ 1 ] ) ) )
 					peaksNew.add( peak );
 			}
 			
@@ -1430,8 +1431,8 @@ public class Matching
 
 	public static void main( String[] args ) throws NotEnoughDataPointsException
 	{
-		Point p1 = new Point( new float[]{ 10, 20 } );
-		Point p2 = new Point( new float[]{ 100, 200 } );
+		Point p1 = new Point( new double[]{ 10, 20 } );
+		Point p2 = new Point( new double[]{ 100, 200 } );
 		
 		TranslationModel2D m = new TranslationModel2D();
 		

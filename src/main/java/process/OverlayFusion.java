@@ -328,18 +328,18 @@ public class OverlayFusion
 		final int numTimePoints = models.size() / numImages;
 		
 		// estimate the bounaries of the output image
-		final float[][] max = new float[ numImages * numTimePoints ][];
-		final float[][] min = new float[ numImages * numTimePoints ][ dimensionality ];
+		final double[][] max = new double[ numImages * numTimePoints ][];
+		final double[][] min = new double[ numImages * numTimePoints ][ dimensionality ];
 		
 		if ( dimensionality == 2 )
 		{
 			for ( int i = 0; i < numImages * numTimePoints; ++i )
-				max[ i ] = new float[] { imgSizes[ i % numImages ][ 0 ], imgSizes[ i % numImages ][ 1 ] };
+				max[ i ] = new double[] { imgSizes[ i % numImages ][ 0 ], imgSizes[ i % numImages ][ 1 ] };
 		}
 		else
 		{
 			for ( int i = 0; i < numImages * numTimePoints; ++i )
-				max[ i ] = new float[] { imgSizes[ i % numImages ][ 0 ], imgSizes[ i % numImages ][ 1 ], imgSizes[ i % numImages ][ 2 ] };
+				max[ i ] = new double[] { imgSizes[ i % numImages ][ 0 ], imgSizes[ i % numImages ][ 1 ], imgSizes[ i % numImages ][ 2 ] };
 		}
 		
 		//IJ.log( "1: " + Util.printCoordinates( min[ 0 ] ) + " -> " + Util.printCoordinates( max[ 0 ] ) );
@@ -361,8 +361,8 @@ public class OverlayFusion
 		//IJ.log( "2: " + Util.printCoordinates( min[ 1 ] ) + " -> " + Util.printCoordinates( max[ 1 ] ) );
 		
 		// dimensions of the final image
-		final float[] minImg = new float[ dimensionality ];
-		final float[] maxImg = new float[ dimensionality ];
+		final double[] minImg = new double[ dimensionality ];
+		final double[] maxImg = new double[ dimensionality ];
 
 		for ( int d = 0; d < dimensionality; ++d )
 		{
@@ -386,8 +386,8 @@ public class OverlayFusion
 		
 		for ( int d = 0; d < dimensionality; ++d )
 		{
-			size[ d ] = Math.round( maxImg[ d ] - minImg[ d ] );
-			offset[ d ] = minImg[ d ];			
+			size[ d ] = (int)Math.round( maxImg[ d ] - minImg[ d ] );
+			offset[ d ] = (float)minImg[ d ];
 		}
 		
 		//IJ.log( "size: " + Util.printCoordinates( size ) );
@@ -431,7 +431,7 @@ public class OverlayFusion
             		final LocalizableCursor<T> out = output.createLocalizableCursor();
             		final Interpolator<FloatType> in = input.createInterpolator( factory );
             		
-            		final float[] tmp = new float[ input.getNumDimensions() ];
+            		final double[] tmp = new double[ input.getNumDimensions() ];
             		
             		try 
             		{
@@ -448,7 +448,7 @@ public class OverlayFusion
             				
             				transform.applyInverseInPlace( tmp );
             	
-            				in.setPosition( tmp );			
+            				in.setPosition( tmp );
             				out.getType().setReal( in.getType().get() );
             			}
             		} 
