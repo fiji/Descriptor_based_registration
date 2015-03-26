@@ -41,7 +41,7 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>SPIM_Registration</artifactId>
-			<version>2.1.1-SNAPSHOT</version>
+			<version>2.1.4</version>
 		</dependency>
 
 		<!-- Fiji dependencies -->
