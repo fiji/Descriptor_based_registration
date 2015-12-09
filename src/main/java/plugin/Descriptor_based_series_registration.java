@@ -22,6 +22,7 @@ import mpicbg.models.InvertibleBoundable;
 import mpicbg.models.RigidModel2D;
 import mpicbg.models.RigidModel3D;
 import mpicbg.models.SimilarityModel2D;
+import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
 import mpicbg.spim.segmentation.InteractiveDoG;
@@ -181,7 +182,7 @@ public class Descriptor_based_series_registration implements PlugIn
 	}
 
 	public String[] transformationModels2d = new String[] { "Translation (2d)", "Rigid (2d)", "Similarity (2d)", "Affine (2d)", "Homography (2d)" };
-	public String[] transformationModels3d = new String[] { "Translation (3d)", "Rigid (3d)", "Affine (3d)" };
+	public String[] transformationModels3d = new String[] { "Translation (3d)", "Rigid (3d)", "Similarity (3d)", "Affine (3d)" };
 	public static String[] localizationChoice = { "None", "3-dimensional quadratic fit", "Gaussian mask localization fit" };
 	public static int defaultTransformationModel = 1;
 	public static int defaultLocalization = 1;
@@ -383,6 +384,9 @@ public class Descriptor_based_series_registration implements PlugIn
 					params.model = new RigidModel3D();
 					break;
 				case 2:
+					params.model = new SimilarityModel3D();
+					break;
+				case 3:
 					params.model = new AffineModel3D();
 					break;
 				default:
@@ -445,6 +449,9 @@ public class Descriptor_based_series_registration implements PlugIn
 						params.model = new InterpolatedAffineModel3D( params.model, new RigidModel3D(), (float)params.lambda );
 						break;
 					case 2:
+						params.model = new InterpolatedAffineModel3D( params.model, new SimilarityModel3D(), (float)params.lambda );
+						break;
+					case 3:
 						params.model = new InterpolatedAffineModel3D( params.model, new AffineModel3D(), (float)params.lambda );
 						break;
 					default:
