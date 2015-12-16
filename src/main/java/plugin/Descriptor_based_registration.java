@@ -10,7 +10,7 @@ import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
 import ij.plugin.PlugIn;
 
-import javax.media.j3d.Transform3D;
+import org.scijava.java3d.Transform3D;
 
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.models.AffineModel2D;
