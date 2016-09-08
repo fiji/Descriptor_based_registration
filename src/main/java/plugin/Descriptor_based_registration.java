@@ -809,7 +809,6 @@ public class Descriptor_based_registration implements PlugIn
 	 * The results are stored in the same array.
 	 * If called with values[ 2 ], sigma2 changing will be disabled
 	 * 
-	 * @param text - the text which is shown when asking for the file
 	 * @param values - the initial values and also contains the result
 	 * @param sigmaMax - the maximal sigma allowed by the interactive app
 	 * @return {@link InteractiveDoG} - the instance for querying additional parameters
