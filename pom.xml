@@ -87,8 +87,8 @@
 	</ciManagement>
 
 	<properties>
-		<scijava.jvm.version>1.7</scijava.jvm.version>
-		<SPIM_Registration.version>4.0.0</SPIM_Registration.version>
+		<scijava.jvm.version>1.8</scijava.jvm.version>
+		<SPIM_Registration.version>5.0.7</SPIM_Registration.version>
 	</properties>
 
 	<repositories>
@@ -133,12 +133,6 @@
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>ij</artifactId>
-		</dependency>
-
-		<!-- Java 3D dependencies -->
-		<dependency>
-			<groupId>org.scijava</groupId>
-			<artifactId>j3dcore</artifactId>
 		</dependency>
 
 		<!-- Third party dependencies -->

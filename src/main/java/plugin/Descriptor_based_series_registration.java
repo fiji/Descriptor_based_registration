@@ -566,7 +566,7 @@ public class Descriptor_based_series_registration implements PlugIn
 			defaultDetectionType = 0;
 	
 		// other parameters
-		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSenstivity );
+		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSensitivity );
 		params.similarOrientation = similarOrientation;
 		params.numNeighbors = numNeighbors;
 		params.redundancy = redundancy;

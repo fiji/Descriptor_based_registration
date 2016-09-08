@@ -10,8 +10,6 @@ import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
 import ij.plugin.PlugIn;
 
-import org.scijava.java3d.Transform3D;
-
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.models.AffineModel2D;
 import mpicbg.models.AffineModel3D;
@@ -28,6 +26,7 @@ import mpicbg.models.TranslationModel3D;
 import mpicbg.spim.segmentation.InteractiveDoG;
 import mpicbg.util.TransformUtils;
 import process.Matching;
+import spim.vecmath.Transform3D;
 
 public class Descriptor_based_registration implements PlugIn 
 {
@@ -523,7 +522,7 @@ public class Descriptor_based_registration implements PlugIn
 			defaultDetectionType = 0;
 		
 		// other parameters
-		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSenstivity );
+		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSensitivity );
 		if ( similarOrientation == 0 )
 			params.similarOrientation = false;
 		else
