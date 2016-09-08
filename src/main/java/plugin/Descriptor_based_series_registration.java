@@ -30,8 +30,8 @@ import process.OverlayFusion;
 
 public class Descriptor_based_series_registration implements PlugIn
 {
-	final private String myURL = "http://fly.mpi-cbg.de/preibisch";
-	final private String paperURL = "http://www.nature.com/nmeth/journal/v7/n6/full/nmeth0610-418.html";
+	final static protected String myURL = "http://preibischlab.mdc-berlin.de";
+	final static protected String paperURL = "http://www.nature.com/nmeth/journal/v7/n6/full/nmeth0610-418.html";
 
 	public static int defaultImg = 0;
 	public static boolean defaultReApply = false;
