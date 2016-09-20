@@ -16,6 +16,7 @@ import mpicbg.spim.io.IOFunctions;
 import mpicbg.spim.registration.ViewStructure;
 import net.imglib2.RandomAccessible;
 import net.imglib2.view.Views;
+import spim.Threads;
 
 public class DetectionSegmentation
 {
@@ -70,6 +71,7 @@ public class DetectionSegmentation
 		// compute difference of gaussian
 		final DifferenceOfGaussianReal1< FloatType > dog = new DifferenceOfGaussianReal1< FloatType >( img, oobsFactory, sigmaDiff[0], sigmaDiff[1], minInitialPeakValue, K_MIN1_INV );
 		dog.setKeepDoGImage( true );
+		dog.setNumThreads( Threads.numThreads() );
 		
 		if ( !dog.checkInput() || !dog.process() )
 		{
@@ -101,6 +103,7 @@ public class DetectionSegmentation
 			final SubpixelLocalization< FloatType > spl = new SubpixelLocalization< FloatType >( dog.getDoGImage(), dog.getPeaks() );
 			spl.setAllowMaximaTolerance( true );
 			spl.setMaxNumMoves( 10 );
+			spl.setNumThreads( Threads.numThreads() );
 			
 			if ( !spl.checkInput() || !spl.process() )
 			{
