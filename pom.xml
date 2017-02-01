@@ -3,9 +3,9 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>sc.fiji</groupId>
-		<artifactId>pom-fiji</artifactId>
-		<version>18.1.0</version>
+		<groupId>org.scijava</groupId>
+		<artifactId>pom-scijava</artifactId>
+		<version>13.0.0</version>
 		<relativePath />
 	</parent>
 
@@ -13,7 +13,18 @@
 	<version>2.1.2-SNAPSHOT</version>
 
 	<name>plugins/Descriptor_based_registration.jar</name>
-	<description />
+	<description>Descriptor-based registration plugin</description>
+	<url>http://imagej.net/Descriptor-based_registration_(2d/3d)</url>
+	<inceptionYear>2011</inceptionYear>
+	<organization>
+		<name>Max-Planck Institute for Molecular Cell Biology and Genetics (MPI-CBG)</name>
+		<url>http://mpi-cbg.de/</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>N/A</name>
+		</license>
+	</licenses>
 
 	<developers>
 		<developer>
@@ -70,6 +81,12 @@
 			<properties><id>tinevez</id></properties>
 		</contributor>
 	</contributors>
+	
+	<mailingLists>
+		<mailingList>
+			<name>N/A</name>
+		</mailingList>
+	</mailingLists>
 
 	<scm>
 		<connection>scm:git:git://github.com/fiji/Descriptor_based_registration</connection>
@@ -90,6 +107,8 @@
 		<scijava.jvm.version>1.8</scijava.jvm.version>
 		<SPIM_Registration.version>5.0.8</SPIM_Registration.version>
 		<pom-bigdataviewer.version>4.0.1</pom-bigdataviewer.version>
+		<license.licenseName>N/A</license.licenseName>
+		<license.copyrightOwners>Stephan Preibisch</license.copyrightOwners>
 	</properties>
 
 	<repositories>
@@ -120,6 +139,16 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>SPIM_Registration</artifactId>
+			<exclusions>
+				<exclusion>
+					<artifactId>ome-xml</artifactId>
+					<groupId>ome</groupId>
+				</exclusion>
+				<exclusion>
+					<artifactId>formats-common</artifactId>
+					<groupId>ome</groupId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>sc.fiji</groupId>
@@ -128,9 +157,19 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>legacy-imglib1</artifactId>
+			<exclusions>
+				<exclusion>
+					<artifactId>ome-xml</artifactId>
+					<groupId>ome</groupId>
+				</exclusion>
+				<exclusion>
+					<artifactId>formats-common</artifactId>
+					<groupId>ome</groupId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
-			<!-- ImageJ dependencies -->
+		<!-- ImageJ dependencies -->
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>ij</artifactId>
