@@ -13,10 +13,9 @@ import mpicbg.imglib.outofbounds.OutOfBoundsStrategyFactory;
 import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.imglib.wrapper.ImgLib1;
 import mpicbg.spim.io.IOFunctions;
-import mpicbg.spim.registration.ViewStructure;
 import net.imglib2.RandomAccessible;
 import net.imglib2.view.Views;
-import spim.Threads;
+import net.preibisch.mvrecon.Threads;
 
 public class DetectionSegmentation
 {
@@ -75,8 +74,7 @@ public class DetectionSegmentation
 		
 		if ( !dog.checkInput() || !dog.process() )
 		{
-			if ( debugLevel <= ViewStructure.DEBUG_ERRORONLY )
-				IOFunctions.println("(" + new Date(System.currentTimeMillis()) + "): Cannot compute difference of gaussian for " + dog.getErrorMessage() );
+			IOFunctions.println("(" + new Date(System.currentTimeMillis()) + "): Cannot compute difference of gaussian for " + dog.getErrorMessage() );
 			
 			return new ArrayList< DifferenceOfGaussianPeak< FloatType > >();
 		}
@@ -106,11 +104,8 @@ public class DetectionSegmentation
 			spl.setNumThreads( Threads.numThreads() );
 			
 			if ( !spl.checkInput() || !spl.process() )
-			{
-				if ( debugLevel <= ViewStructure.DEBUG_ERRORONLY )
-					IOFunctions.println("(" + new Date(System.currentTimeMillis()) + "): Warning! Failed to compute subpixel localization " + spl.getErrorMessage() );
-			}
-			
+				IOFunctions.println("(" + new Date(System.currentTimeMillis()) + "): Warning! Failed to compute subpixel localization " + spl.getErrorMessage() );
+
 			//dog.getDoGImage().getDisplay().setMinMax();
 			//ImageJFunctions.copyToImagePlus( dog.getDoGImage() ).show();
 			dog.getDoGImage().close();
@@ -152,13 +147,13 @@ public class DetectionSegmentation
 					}
 				}
 			}
-			if ( debugLevel <= ViewStructure.DEBUG_ALL )
-			{
-				IOFunctions.println( "number of peaks: " + dog.getPeaks().size() );
-				IOFunctions.println( "invalid: " + invalid );
-				IOFunctions.println( "extrema: " + extrema );
-				IOFunctions.println( "peak to low: " + peakTooLow );
-			}
+
+			/*
+			IOFunctions.println( "number of peaks: " + dog.getPeaks().size() );
+			IOFunctions.println( "invalid: " + invalid );
+			IOFunctions.println( "extrema: " + extrema );
+			IOFunctions.println( "peak to low: " + peakTooLow );
+			*/
 		}
 		else if ( localization == 2 )
 		{

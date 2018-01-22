@@ -24,19 +24,24 @@ import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.imglib2.util.Util;
+import net.preibisch.mvrecon.Threads;
+import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussian.SpecialPoint;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
 import mpicbg.imglib.container.array.ArrayContainerFactory;
+import mpicbg.imglib.cursor.Cursor;
 import mpicbg.imglib.cursor.LocalizableCursor;
 import mpicbg.imglib.cursor.array.ArrayCursor;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.image.ImageFactory;
+import mpicbg.imglib.multithreading.Chunk;
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.imglib.outofbounds.OutOfBoundsStrategyMirrorFactory;
 import mpicbg.imglib.type.numeric.integer.UnsignedByteType;
 import mpicbg.imglib.type.numeric.integer.UnsignedShortType;
 import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.models.AbstractAffineModel3D;
+import mpicbg.models.AffineModel3D;
 import mpicbg.models.InterpolatedAffineModel2D;
 import mpicbg.models.InterpolatedAffineModel3D;
 import mpicbg.models.InvertibleBoundable;
@@ -44,9 +49,11 @@ import mpicbg.models.Model;
 import mpicbg.models.NotEnoughDataPointsException;
 import mpicbg.models.Point;
 import mpicbg.models.PointMatch;
+import mpicbg.models.RigidModel3D;
 import mpicbg.models.Tile;
 import mpicbg.models.TileConfiguration;
 import mpicbg.models.TranslationModel2D;
+import mpicbg.models.TranslationModel3D;
 import mpicbg.pointdescriptor.AbstractPointDescriptor;
 import mpicbg.pointdescriptor.ModelPointDescriptor;
 import mpicbg.pointdescriptor.SimplePointDescriptor;
@@ -58,9 +65,7 @@ import mpicbg.pointdescriptor.model.TranslationInvariantRigidModel2D;
 import mpicbg.pointdescriptor.model.TranslationInvariantRigidModel3D;
 import mpicbg.pointdescriptor.similarity.SimilarityMeasure;
 import mpicbg.pointdescriptor.similarity.SquareDistance;
-import mpicbg.spim.registration.ViewDataBeads;
-import mpicbg.spim.registration.ViewStructure;
-import mpicbg.spim.registration.bead.BeadRegistration;
+import mpicbg.spim.io.IOFunctions;
 import plugin.DescriptorParameters;
 import plugin.Descriptor_based_registration;
 import plugin.Descriptor_based_series_registration;
@@ -185,8 +190,8 @@ public class Matching
 				//IJ.log( "model2: " + model2 );
 				try
 				{
-					BeadRegistration.concatenateAxialScaling( (AbstractAffineModel3D<?>)model1, imp1.getCalibration().pixelDepth / imp1.getCalibration().pixelWidth );				
-					BeadRegistration.concatenateAxialScaling( (AbstractAffineModel3D<?>)model2, imp2.getCalibration().pixelDepth / imp2.getCalibration().pixelWidth );
+					concatenateAxialScaling( (AbstractAffineModel3D<?>)model1, imp1.getCalibration().pixelDepth / imp1.getCalibration().pixelWidth );				
+					concatenateAxialScaling( (AbstractAffineModel3D<?>)model2, imp2.getCalibration().pixelDepth / imp2.getCalibration().pixelWidth );
 				}
 				catch (Exception e) 
 				{
@@ -209,7 +214,44 @@ public class Matching
 		
 		return numInliers;
 	}
-	
+
+	public static void concatenateAxialScaling( final AbstractAffineModel3D model, final double zStretching )
+	{
+		if ( model != null )
+		{
+			if ( model instanceof AffineModel3D )
+			{
+				final AffineModel3D tmpModel = new AffineModel3D();
+				final float z = (float)zStretching;
+				
+				tmpModel.set( 1f, 0f, 0f, 0f, 
+				              0f, 1f, 0f, 0f,
+				              0f, 0f, z,  0f );
+				
+				((AffineModel3D)model).concatenate( tmpModel );
+			}
+			else if ( model instanceof RigidModel3D )
+			{
+				final RigidModel3D tmpModel = new RigidModel3D();
+				final float z = (float)zStretching;
+
+				tmpModel.set( 1f, 0f, 0f, 0f, 
+							  0f, 1f, 0f, 0f,
+							  0f, 0f, z,  0f );
+
+				((RigidModel3D)model).concatenate( tmpModel );
+			}
+			else if ( model instanceof TranslationModel3D )
+			{
+				IOFunctions.println( "Cannot concatenate Axial Scaling with TranslationModel3D, you can load the registration as Affine or Rigid model and run it then!" );
+			}
+			else
+			{
+				IOFunctions.println( "Cannot concatenate Axial Scaling, unknown model: " + model.getClass().getSimpleName() );
+			}
+		}		
+	}
+
 	public static ArrayList<InvertibleBoundable> descriptorBasedStackRegistration( final ImagePlus imp, final DescriptorParameters params )
 	{
 		final ArrayList<InvertibleBoundable> models;
@@ -358,7 +400,7 @@ public class Matching
 				try
 				{
 					for ( final InvertibleBoundable model : models )
-						BeadRegistration.concatenateAxialScaling( (AbstractAffineModel3D<?>)model, imp.getCalibration().pixelDepth / imp.getCalibration().pixelWidth );
+						concatenateAxialScaling( (AbstractAffineModel3D<?>)model, imp.getCalibration().pixelDepth / imp.getCalibration().pixelWidth );
 				}
 				catch (Exception e) 
 				{
@@ -1060,9 +1102,73 @@ public class Matching
 			}
 		}
 
-		ViewDataBeads.normalizeImage( img, minmax );
+		normalizeImage( img, minmax );
 
 		return img;
+	}
+
+	/**
+	 * Normalizes the image to the range [0...1]
+	 * 
+	 * @param image - the image to normalize
+	 * @param minmax - null or a predefined min/max range (array[ 0 ] == min and array[ 1 ] == max)
+	 * @return - a new float[] array with array[ 0 ] == min and array[ 1 ] == max
+	 */
+	public static float[] normalizeImage( final Image<FloatType> image, float[] minmax )
+	{
+		if ( minmax == null || minmax.length < 2 )
+			image.getDisplay().setMinMax();
+		else
+			image.getDisplay().setMinMax( minmax[ 0 ], minmax[ 1 ] );
+
+		final float min = (float)image.getDisplay().getMin();
+		final float max = (float)image.getDisplay().getMax();
+		final float diff = max - min;
+
+		if ( Float.isNaN( diff ) || Float.isInfinite(diff) || diff == 0 )
+		{
+			IOFunctions.println("Cannot normalize image " + image.getName() + ", min=" + min + "  + max=" + max );
+			return new float[]{ min, max };
+		}
+
+		final Vector< Chunk > threadChunks = SimpleMultiThreading.divideIntoChunks( image.getNumPixels(), Threads.numThreads() );
+		final int numThreads = threadChunks.size();
+
+		final AtomicInteger ai = new AtomicInteger(0);
+		final Thread[] threads = SimpleMultiThreading.newThreads( numThreads );
+		for ( int ithread = 0; ithread < threads.length; ++ithread )
+			threads[ithread] = new Thread(new Runnable()
+			{
+				public void run()
+				{
+					// Thread ID
+					final int myNumber = ai.getAndIncrement();
+
+					// get chunk of pixels to process
+					final Chunk myChunk = threadChunks.get( myNumber );
+					final long loopSize = myChunk.getLoopSize();
+
+					final Cursor<FloatType> cursor = image.createCursor();
+					cursor.fwd( myChunk.getStartPosition() );
+
+					for ( long l = 0; l < loopSize; ++l )
+					{
+						cursor.fwd();
+
+						final float value = cursor.getType().get();
+						final float norm = (value - min) / diff;
+
+						cursor.getType().set( norm );
+					}
+				
+				}
+			});
+
+		SimpleMultiThreading.startAndJoin( threads );
+
+		image.getDisplay().setMinMax(0, 1);
+
+		return new float[]{ min, max };
 	}
 
 	protected static ArrayList<DifferenceOfGaussianPeak<FloatType>> filterForROI( final Roi roi, final ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks )
@@ -1390,7 +1496,7 @@ public class Matching
 			final int iterations, final double[] sigmaGuess, final int[] region ) // gaussian fit parameters
 	{
 		return DetectionSegmentation.extractBeadsLaPlaceImgLib( image, new OutOfBoundsStrategyMirrorFactory<FloatType>(), 0.5f, sigma1, sigma2, threshold, threshold/4, lookForMaxima, lookForMinima, 
-				localization, iterations, sigmaGuess, region, ViewStructure.DEBUG_MAIN );
+				localization, iterations, sigmaGuess, region, 0 );
 	}
 
 	private static PrintWriter openFileWrite(final File file)
