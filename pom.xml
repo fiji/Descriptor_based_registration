@@ -132,10 +132,6 @@
 		</dependency>
 		<dependency>
 			<groupId>sc.fiji</groupId>
-			<artifactId>SPIM_Registration</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>sc.fiji</groupId>
 			<artifactId>fiji-lib</artifactId>
 		</dependency>
 		<dependency>
@@ -153,6 +149,11 @@
 		<dependency>
 			<groupId>mpicbg</groupId>
 			<artifactId>mpicbg</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.preibisch</groupId>
+			<artifactId>multiview-reconstruction</artifactId>
+			<version>0.1.10</version>
 		</dependency>
 	</dependencies>
 </project>
