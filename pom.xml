@@ -133,6 +133,7 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>SPIM_Registration</artifactId>
+			<version>5.0.20</version>
 		</dependency>
 		<dependency>
 			<groupId>sc.fiji</groupId>
