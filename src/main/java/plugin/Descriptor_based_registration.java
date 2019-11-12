@@ -22,8 +22,8 @@ import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
 import mpicbg.spim.segmentation.InteractiveDoG;
-import mpicbg.util.TransformUtils;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
+import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 import net.preibisch.mvrecon.vecmath.Transform3D;
 import process.Matching;
 
@@ -595,10 +595,10 @@ public class Descriptor_based_registration implements PlugIn
 					t3.rotY( Math.toRadians( defaultDegrees3 ) );
 				else
 					t3.rotZ( Math.toRadians( defaultDegrees3 ) );
-				
-				final AffineModel3D m1 = TransformUtils.getAffineModel3D( t1 );
-				final AffineModel3D m2 = TransformUtils.getAffineModel3D( t2 );
-				final AffineModel3D m3 = TransformUtils.getAffineModel3D( t3 );
+
+				final AffineModel3D m1 = TransformationTools.getAffineModel3D( t1 );
+				final AffineModel3D m2 = TransformationTools.getAffineModel3D( t2 );
+				final AffineModel3D m3 = TransformationTools.getAffineModel3D( t3 );
 
 				m1.preConcatenate( m2 );
 				m1.preConcatenate( m3 );
