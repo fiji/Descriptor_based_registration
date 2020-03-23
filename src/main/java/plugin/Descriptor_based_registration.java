@@ -21,7 +21,7 @@ import mpicbg.models.SimilarityModel2D;
 import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
-import mpicbg.spim.segmentation.InteractiveDoG;
+import net.preibisch.legacy.segmentation.InteractiveDoG;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 import net.preibisch.mvrecon.vecmath.Transform3D;

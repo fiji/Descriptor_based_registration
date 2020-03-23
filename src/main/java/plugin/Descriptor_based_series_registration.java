@@ -1,5 +1,7 @@
 package plugin;
 
+import java.util.ArrayList;
+
 import fiji.stacks.Hyperstack_rearranger;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
@@ -9,9 +11,6 @@ import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
 import ij.plugin.PlugIn;
-
-import java.util.ArrayList;
-
 import mpicbg.models.AffineModel2D;
 import mpicbg.models.AffineModel3D;
 import mpicbg.models.HomographyModel2D;
@@ -24,7 +23,7 @@ import mpicbg.models.SimilarityModel2D;
 import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
-import mpicbg.spim.segmentation.InteractiveDoG;
+import net.preibisch.legacy.segmentation.InteractiveDoG;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
 import process.Matching;
 import process.OverlayFusion;

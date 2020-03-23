@@ -24,6 +24,7 @@ import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.imglib2.util.Util;
+import net.preibisch.legacy.io.IOFunctions;
 import net.preibisch.mvrecon.Threads;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.AbstractPointDescriptor;
@@ -65,7 +66,6 @@ import mpicbg.models.Tile;
 import mpicbg.models.TileConfiguration;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
-import mpicbg.spim.io.IOFunctions;
 import plugin.DescriptorParameters;
 import plugin.Descriptor_based_registration;
 import plugin.Descriptor_based_series_registration;

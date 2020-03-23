@@ -12,9 +12,9 @@ import mpicbg.imglib.image.Image;
 import mpicbg.imglib.outofbounds.OutOfBoundsStrategyFactory;
 import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.imglib.wrapper.ImgLib1;
-import mpicbg.spim.io.IOFunctions;
 import net.imglib2.RandomAccessible;
 import net.imglib2.view.Views;
+import net.preibisch.legacy.io.IOFunctions;
 import net.preibisch.mvrecon.Threads;
 
 public class DetectionSegmentation
