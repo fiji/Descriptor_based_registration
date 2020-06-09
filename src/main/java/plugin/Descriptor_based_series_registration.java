@@ -44,6 +44,8 @@ public class Descriptor_based_series_registration implements PlugIn
 	// one can define the location of the first pixel in another coordinate system if required
 	public static float[] offset = null;
 
+	public static boolean oneModelPerChannel = false;
+
 	@Override
 	public void run( final String arg0 ) 
 	{
@@ -119,7 +121,12 @@ public class Descriptor_based_series_registration implements PlugIn
 		// reapply?
 		if ( reApply )
 		{
-			if ( lastModels.size() < imp.getNFrames() )
+			if ( lastModels.size() == imp.getNChannels() && imp.getNFrames() != imp.getNChannels() )
+			{
+				IJ.log( "WARNING: Assuming that there is one model per channel." );
+				oneModelPerChannel = true;
+			}
+			else if ( lastModels.size() < imp.getNFrames() )
 			{
 				IJ.log( "Cannot reapply, you have only " + lastModels.size() + " models, but the series size is" + imp.getNFrames() + "." );
 				defaultReApply = false;
