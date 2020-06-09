@@ -11,7 +11,7 @@
 
 	<groupId>sc.fiji</groupId>
 	<artifactId>Descriptor_based_registration</artifactId>
-	<version>2.1.5-SNAPSHOT</version>
+	<version>2.1.5</version>
 
 	<name>Descriptor based registration</name>
 	<description>Descriptor based registration plugin for Fiji.</description>
@@ -95,7 +95,7 @@
 	<scm>
 		<connection>scm:git:git://github.com/fiji/Descriptor_based_registration</connection>
 		<developerConnection>scm:git:git@github.com:fiji/Descriptor_based_registration</developerConnection>
-		<tag>HEAD</tag>
+		<tag>Descriptor_based_registration-2.1.5</tag>
 		<url>https://github.com/fiji/Descriptor_based_registration</url>
 	</scm>
 	<issueManagement>
