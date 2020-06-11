@@ -146,6 +146,7 @@ public class Descriptor_based_registration implements PlugIn
 			params.reApply = true;
 			params.fuse = 0;
 			params.setPointsRois = false;
+			params.interpolation = Descriptor_based_series_registration.defaultInterpolation;
 			Matching.descriptorBasedRegistration( imp1, imp2, params );
 			return;			
 		}
@@ -274,6 +275,7 @@ public class Descriptor_based_registration implements PlugIn
 		gd.addMessage( "Image fusion" );
 		gd.addCheckbox( "Create_overlayed images", defaultCreateOverlay );
 		gd.addCheckbox( "Add_point_rois for corresponding features to images", defaultAddPointRoi );
+		gd.addChoice( "Interpolation", Descriptor_based_series_registration.interpolationChoices, Descriptor_based_series_registration.interpolationChoices[ Descriptor_based_series_registration.defaultInterpolation ] );
 
 		gd.addMessage("");
 		gd.addMessage("This Plugin is developed by Stephan Preibisch\n" + myURL);
@@ -308,8 +310,8 @@ public class Descriptor_based_registration implements PlugIn
 		final int channel2 = (int)Math.round( gd.getNextNumber() ) - 1;
 		final boolean createOverlay = gd.getNextBoolean();
 		final boolean addPointRoi = gd.getNextBoolean();
-		
-		
+		final int interpolation = Descriptor_based_series_registration.defaultInterpolation = gd.getNextChoiceIndex();
+
 		// update static values for next call
 		defaultDetectionBrightness = detectionBrightnessIndex;
 		defaultDetectionSize = detectionSizeIndex;
@@ -537,6 +539,7 @@ public class Descriptor_based_registration implements PlugIn
 			params.fuse = 0;
 		else
 			params.fuse = 2;
+		params.interpolation = interpolation;
 		params.setPointsRois = addPointRoi;
 		params.localization = localization;
 

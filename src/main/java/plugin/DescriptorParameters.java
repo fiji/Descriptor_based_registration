@@ -108,7 +108,10 @@ public class DescriptorParameters
 
 	// 0 == fuse in memory, 1 == write to disk, 2 == nothing
 	public int fuse = 0;
-	
+
+	// 0 == linear, 1 == nearest neighbor
+	public int interpolation = 0;
+
 	protected AbstractModel< ? > initialModel = null; 
 	public AbstractModel<?> getInitialModel()
 	{

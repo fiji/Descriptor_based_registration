@@ -149,12 +149,14 @@ public class Descriptor_based_series_registration implements PlugIn
 
 			final GenericDialog gd2 = new GenericDialog( "Descriptor based stack registration" );
 			gd2.addChoice( "Image fusion", resultChoices, resultChoices[ defaultResult ] );
+			gd2.addChoice( "Interpolation", interpolationChoices, interpolationChoices[ defaultInterpolation ] );
 
 			gd2.showDialog();
 			if ( gd2.wasCanceled() )
 				return;
 
 			final int result = defaultResult = gd2.getNextChoiceIndex();
+			final int interpolation = defaultInterpolation = gd2.getNextChoiceIndex();
 
 			if ( defaultResult == 1 )
 			{
@@ -173,6 +175,7 @@ public class Descriptor_based_series_registration implements PlugIn
 			params.reApply = true;
 			params.dimensionality = dimensionality;
 			params.fuse = result;
+			params.interpolation = interpolation;
 			params.directory = defaultDirectory;
 			Matching.descriptorBasedStackRegistration( imp, params );
 			return;
@@ -223,6 +226,9 @@ public class Descriptor_based_series_registration implements PlugIn
 	
 	public static String[] resultChoices = { "Fuse and display", "Write to disk", "Do not fuse" };
 	public static int defaultResult = 0;
+
+	public static String[] interpolationChoices = { "Linear Interpolation", "Nearest Neighbor Interpolation" };
+	public static int defaultInterpolation = 0;
 
 	public static String defaultDirectory = "";
 
@@ -300,7 +306,8 @@ public class Descriptor_based_series_registration implements PlugIn
 		gd.addSlider( "Choose_registration_channel" , 1, numChannels, defaultChannel );
 		gd.addMessage( "" );
 		gd.addChoice( "Image fusion", resultChoices, resultChoices[ defaultResult ] );
-		
+		gd.addChoice( "Interpolation", interpolationChoices, interpolationChoices[ defaultInterpolation ] );
+
 		gd.addMessage("");
 		gd.addMessage("This Plugin is developed by Stephan Preibisch\n" + myURL);
 
@@ -332,7 +339,8 @@ public class Descriptor_based_series_registration implements PlugIn
 		// zero-offset channel
 		final int channel = (int)Math.round( gd.getNextNumber() ) - 1;
 		final int result = gd.getNextChoiceIndex();
-		
+		final int interpolation = gd.getNextChoiceIndex();
+
 		// update static values for next call
 		defaultDetectionBrightness = detectionBrightnessIndex;
 		defaultDetectionSize = detectionSizeIndex;
@@ -349,6 +357,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		defaultRange = range;
 		defaultChannel = channel + 1;
 		defaultResult = result;
+		defaultInterpolation = interpolation;
 
 		// instantiate model
 		if ( dimensionality == 2 )
@@ -588,7 +597,8 @@ public class Descriptor_based_series_registration implements PlugIn
 		params.range = range;
 		params.dimensionality = dimensionality;
 		params.localization = localization;
-		
+		params.interpolation = interpolation;
+
 		return params;
 	}
 
