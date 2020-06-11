@@ -11,7 +11,7 @@
 
 	<groupId>sc.fiji</groupId>
 	<artifactId>Descriptor_based_registration</artifactId>
-	<version>3.0.2</version>
+	<version>3.0.3-SNAPSHOT</version>
 
 	<name>Descriptor based registration</name>
 	<description>Descriptor based registration plugin for Fiji.</description>
