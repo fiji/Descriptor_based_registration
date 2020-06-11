@@ -23,7 +23,6 @@ import mpicbg.imglib.image.ImageFactory;
 import mpicbg.imglib.image.display.imagej.ImageJFunctions;
 import mpicbg.imglib.interpolation.Interpolator;
 import mpicbg.imglib.interpolation.InterpolatorFactory;
-import mpicbg.imglib.interpolation.lanczos.LanczosInterpolatorFactory;
 import mpicbg.imglib.interpolation.linear.LinearInterpolatorFactory;
 import mpicbg.imglib.interpolation.nearestneighbor.NearestNeighborInterpolatorFactory;
 import mpicbg.imglib.multithreading.Chunk;
@@ -40,10 +39,15 @@ import plugin.Descriptor_based_series_registration;
 public class OverlayFusion 
 {
 	public static boolean useSizeOfFirstImage = false;
-	public static boolean useNearestNeighborInterpolation = false;
-	public static boolean useLanczosInterpolation = false;
-	
-	protected static <T extends RealType<T>> CompositeImage createOverlay( final T targetType, final ImagePlus imp1, final ImagePlus imp2, final InvertibleBoundable finalModel1, final InvertibleBoundable finalModel2, final int dimensionality ) 
+
+	protected static <T extends RealType<T>> CompositeImage createOverlay(
+			final T targetType,
+			final ImagePlus imp1,
+			final ImagePlus imp2,
+			final InvertibleBoundable finalModel1,
+			final InvertibleBoundable finalModel2,
+			final int dimensionality,
+			final int interpolation )
 	{
 		final ArrayList< ImagePlus > images = new ArrayList< ImagePlus >();
 		images.add( imp1 );
@@ -60,13 +64,13 @@ public class OverlayFusion
 			models.add( finalModel2 );
 		}
 
+		IJ.log( "Fusing with " + (interpolation == 0 ? "linear interpolation" : "nearest neighbor interpolation" ) );
+
 		for ( int tp = 1; tp <= ntimepoints; ++tp ) 
 		{
-			if ( useNearestNeighborInterpolation )
+			if ( interpolation == 1 )
 				cis[ tp-1 ] = createOverlay( targetType, images, models, dimensionality, tp, new NearestNeighborInterpolatorFactory<FloatType>( new OutOfBoundsStrategyValueFactory<FloatType>() ) );
-			else if ( useLanczosInterpolation )
-				cis[ tp-1 ] = createOverlay( targetType, images, models, dimensionality, tp, new LanczosInterpolatorFactory<FloatType>( new OutOfBoundsStrategyValueFactory<FloatType>() ) );
-			else
+			else // 0
 				cis[ tp-1 ] = createOverlay( targetType, images, models, dimensionality, tp, new LinearInterpolatorFactory<FloatType>( new OutOfBoundsStrategyValueFactory<FloatType>() ) );
 		}
 
@@ -85,7 +89,13 @@ public class OverlayFusion
 		return new CompositeImage( imp, CompositeImage.COMPOSITE );
 	}
 	
-	public static <T extends RealType<T>> ImagePlus createReRegisteredSeries( final T targetType, final ImagePlus imp, final ArrayList<InvertibleBoundable> models, final int dimensionality, final String directory )
+	public static <T extends RealType<T>> ImagePlus createReRegisteredSeries(
+			final T targetType,
+			final ImagePlus imp,
+			final ArrayList<InvertibleBoundable> models,
+			final int dimensionality,
+			final String directory,
+			final int interpolation )
 	{
 		int numImages;
 
@@ -129,6 +139,8 @@ public class OverlayFusion
 		// the composite
 		final ImageStack stack = new ImageStack( size[ 0 ], size[ 1 ] );
 
+		IJ.log( "Fusing with " + (interpolation == 0 ? "linear interpolation" : "nearest neighbor interpolation" ) );
+
 		for ( int t = 1; t <= imp.getNFrames(); ++t )
 		{
 			IJ.showProgress( t, imp.getNFrames() );
@@ -143,12 +155,11 @@ public class OverlayFusion
 				else
 					model = models.get( t - 1 );
 
-				if ( useNearestNeighborInterpolation )
+				if ( interpolation == 1 )
 					fuseChannel( out, ImageJFunctions.convertFloat( Hyperstack_rearranger.getImageChunk( imp, c, t ) ), offset, model, new NearestNeighborInterpolatorFactory<FloatType>( new OutOfBoundsStrategyValueFactory<FloatType>() ) );
-				else if ( useLanczosInterpolation )
-					fuseChannel( out, ImageJFunctions.convertFloat( Hyperstack_rearranger.getImageChunk( imp, c, t ) ), offset, model, new LanczosInterpolatorFactory<FloatType>( new OutOfBoundsStrategyValueFactory<FloatType>() ) );
 				else
 					fuseChannel( out, ImageJFunctions.convertFloat( Hyperstack_rearranger.getImageChunk( imp, c, t ) ), offset, model, new LinearInterpolatorFactory<FloatType>( new OutOfBoundsStrategyValueFactory<FloatType>() ) );
+
 				try 
 				{
 					final ImagePlus outImp = ((ImagePlusContainer<?,?>)out.getContainer()).getImagePlus();
