@@ -103,8 +103,8 @@
 		<url>https://github.com/fiji/Descriptor_based_registration/issues</url>
 	</issueManagement>
 	<ciManagement>
-		<system>Travis CI</system>
-		<url>https://travis-ci.org/fiji/Descriptor_based_registration</url>
+		<system>GitHub Actions</system>
+		<url>https://github.com/fiji/Descriptor_based_registration/actions</url>
 	</ciManagement>
 
 	<properties>
@@ -116,7 +116,7 @@
 		<SPIM_Registration.version>5.0.20</SPIM_Registration.version>
 
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
-		<releaseProfiles>deploy-to-scijava</releaseProfiles>
+		<releaseProfiles>sign,deploy-to-scijava</releaseProfiles>
 	</properties>
 
 	<repositories>
