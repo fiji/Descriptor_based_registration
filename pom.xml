@@ -93,7 +93,7 @@
 	</mailingLists>
 
 	<scm>
-		<connection>scm:git:git://github.com/fiji/Descriptor_based_registration</connection>
+		<connection>scm:git:https://github.com/fiji/Descriptor_based_registration</connection>
 		<developerConnection>scm:git:git@github.com:fiji/Descriptor_based_registration</developerConnection>
 		<tag>HEAD</tag>
 		<url>https://github.com/fiji/Descriptor_based_registration</url>
