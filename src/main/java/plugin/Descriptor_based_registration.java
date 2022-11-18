@@ -9,7 +9,6 @@ import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
 import ij.plugin.PlugIn;
-import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.models.AffineModel2D;
 import mpicbg.models.AffineModel3D;
 import mpicbg.models.HomographyModel2D;
