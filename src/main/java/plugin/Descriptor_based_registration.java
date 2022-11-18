@@ -1,5 +1,7 @@
 package plugin;
 
+import java.util.Date;
+
 import fiji.stacks.Hyperstack_rearranger;
 import ij.IJ;
 import ij.ImagePlus;
@@ -7,7 +9,6 @@ import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
 import ij.plugin.PlugIn;
-
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.models.AffineModel2D;
 import mpicbg.models.AffineModel3D;
@@ -21,7 +22,10 @@ import mpicbg.models.SimilarityModel2D;
 import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
-import net.preibisch.legacy.segmentation.InteractiveDoG;
+import net.preibisch.legacy.io.IOFunctions;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.HelperFunctions;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoG;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoGParams;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 import net.preibisch.mvrecon.vecmath.Transform3D;
@@ -457,15 +461,15 @@ public class Descriptor_based_registration implements PlugIn
 		{
 			// query parameters interactively
 			final double[] values = new double[]{ defaultSigma, defaultThreshold };
-			final InteractiveDoG idog = getInteractiveDoGParameters( imp1, channel1, values, 20 );
+			final InteractiveDoG idog = getInteractiveDoGParameters( imp1, channel1, values );
 
 			if ( idog.wasCanceled() )
 				return null;
 
-			params.sigma1 = values[ 0 ];
-			params.threshold = values[ 1 ];
-			params.lookForMaxima = idog.getLookForMaxima();
-			params.lookForMinima = idog.getLookForMinima();
+			params.sigma1 = defaultSigma = values[ 0 ];
+			params.threshold = defaultThreshold = values[ 1 ];
+			params.lookForMaxima = defaultInteractiveMaxima;
+			params.lookForMinima = defaultInteractiveMinima;
 		}
 		else 
 		{
@@ -523,7 +527,7 @@ public class Descriptor_based_registration implements PlugIn
 			defaultDetectionType = 0;
 		
 		// other parameters
-		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSensitivity );
+		params.sigma2 = HelperFunctions.computeSigma2( (float)params.sigma1, 4 /*InteractiveDoG.sensitivity*/ );
 		if ( similarOrientation == 0 )
 			params.similarOrientation = false;
 		else
@@ -805,17 +809,14 @@ public class Descriptor_based_registration implements PlugIn
 	}
 	
 	/**
-	 * Can be called with values[ 3 ], i.e. [initialsigma, sigma2, threshold] or
-	 * values[ 2 ], i.e. [initialsigma, threshold]
+	 * Can be called only with values[ 2 ], i.e. [initialsigma, threshold]
 	 * 
 	 * The results are stored in the same array.
-	 * If called with values[ 2 ], sigma2 changing will be disabled
 	 * 
 	 * @param values - the initial values and also contains the result
-	 * @param sigmaMax - the maximal sigma allowed by the interactive app
 	 * @return {@link InteractiveDoG} - the instance for querying additional parameters
 	 */
-	public static InteractiveDoG getInteractiveDoGParameters( final ImagePlus imp, final int channel, final double values[], final float sigmaMax )
+	public static InteractiveDoG getInteractiveDoGParameters( final ImagePlus imp, final int channel, final double values[] )
 	{
 		 if ( imp.isDisplayedHyperStack() )
              imp.setPosition( imp.getStackIndex( channel + 1, imp.getNSlices() / 2 + 1 , 1 ) );
@@ -823,47 +824,45 @@ public class Descriptor_based_registration implements PlugIn
              imp.setSlice( imp.getStackIndex( channel + 1, imp.getNSlices() / 2 + 1 , 1 ) );
 		 
 		imp.setRoi( 0, 0, imp.getWidth()/3, imp.getHeight()/3 );		
-		
-		final InteractiveDoG idog = new InteractiveDoG( imp, channel );
-		idog.setSigmaMax( sigmaMax );
-		idog.setLookForMaxima( defaultInteractiveMaxima );
-		idog.setLookForMinima( defaultInteractiveMinima );
-		
+
+		InteractiveDoGParams params = new InteractiveDoGParams();
+		params.findMaxima = defaultInteractiveMaxima;
+		params.findMinima = defaultInteractiveMinima;
+
 		if ( values.length == 2 )
 		{
-			idog.setSigma2isAdjustable( false );
-			idog.setInitialSigma( (float)values[ 0 ] );
-			idog.setThreshold( (float)values[ 1 ] );
+			params.sigma = (float)values[ 0 ];
+			params.threshold = (float)values[ 1 ];
 		}
 		else
 		{
-			idog.setInitialSigma( (float)values[ 0 ] );
-			idog.setThreshold( (float)values[ 2 ] );			
+			throw new RuntimeException( "modifying sigma2 is not supported by InteractiveDoG" );
 		}
-		
-		idog.run( null );
-		
-		while ( !idog.isFinished() )
-			SimpleMultiThreading.threadWait( 100 );
-		
-		if ( values.length == 2)
+
+		final double min = imp.getDisplayRangeMin();
+		final double max = imp.getDisplayRangeMax();
+
+		IOFunctions.println( "(" + new Date(System.currentTimeMillis() ) + "): Using approximate min [" + min + "]/max[" + max + "] intensity values ... to have a more accurate preview your can manually set min/max intensity." );
+
+		final InteractiveDoG idog = new InteractiveDoG( imp, params, min, max );
+		do
 		{
-			values[ 0 ] = idog.getInitialSigma();
-			values[ 1 ] = idog.getThreshold();
+			try
+			{
+				Thread.sleep( 100 );
+			} catch (InterruptedException e) {}
 		}
-		else
-		{
-			values[ 0 ] = idog.getInitialSigma();
-			values[ 1 ] = idog.getSigma2();						
-			values[ 2 ] = idog.getThreshold();
-		}
-		
+		while (!idog.isFinished());
+
+		values[ 0 ] = params.sigma;
+		values[ 1 ] = params.threshold;
+
 		// remove the roi
 		imp.killRoi();
-		
-		defaultInteractiveMaxima = idog.getLookForMaxima();
-		defaultInteractiveMinima = idog.getLookForMinima();
-		
+
+		defaultInteractiveMaxima = params.findMaxima;
+		defaultInteractiveMinima = params.findMinima;
+
 		return idog;
 	}
 	

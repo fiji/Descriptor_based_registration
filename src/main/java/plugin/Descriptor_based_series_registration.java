@@ -23,7 +23,8 @@ import mpicbg.models.SimilarityModel2D;
 import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
-import net.preibisch.legacy.segmentation.InteractiveDoG;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.HelperFunctions;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoG;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
 import process.Matching;
 import process.OverlayFusion;
@@ -515,16 +516,16 @@ public class Descriptor_based_series_registration implements PlugIn
 				interactiveTmp = new ImagePlus( "First series of " + imp.getTitle(), stack );
 			}
 			interactiveTmp.show();
-			final InteractiveDoG idog = Descriptor_based_registration.getInteractiveDoGParameters( interactiveTmp, 1, values, 20 );
+			final InteractiveDoG idog = Descriptor_based_registration.getInteractiveDoGParameters( interactiveTmp, 1, values );
 			interactiveTmp.close();
 
 			if ( idog.wasCanceled() )
 				return null;
 
-			params.sigma1 = values[ 0 ];
-			params.threshold = values[ 1 ];
-			params.lookForMaxima = idog.getLookForMaxima();
-			params.lookForMinima = idog.getLookForMinima();
+			params.sigma1 = defaultSigma = values[ 0 ];
+			params.threshold = defaultThreshold = values[ 1 ];
+			params.lookForMaxima = Descriptor_based_registration.defaultInteractiveMaxima;
+			params.lookForMinima = Descriptor_based_registration.defaultInteractiveMinima;
 		}
 		else 
 		{
@@ -581,7 +582,7 @@ public class Descriptor_based_series_registration implements PlugIn
 			defaultDetectionType = 0;
 	
 		// other parameters
-		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSensitivity );
+		params.sigma2 = HelperFunctions.computeSigma2( (float)params.sigma1, 4 /*InteractiveDoG.sensitivity*/ );
 		params.similarOrientation = similarOrientation;
 		params.numNeighbors = numNeighbors;
 		params.redundancy = redundancy;
