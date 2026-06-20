@@ -2,7 +2,7 @@
  * #%L
  * Fiji distribution of ImageJ for the life sciences.
  * %%
- * Copyright (C) 2011 - 2022 Fiji developers.
+ * Copyright (C) 2011 - 2026 Fiji developers.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
@@ -46,16 +46,21 @@ import ij.process.ShortProcessor;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussian.SpecialPoint;
 import mpicbg.imglib.algorithm.scalespace.DifferenceOfGaussianPeak;
 import mpicbg.imglib.container.array.ArrayContainerFactory;
+import mpicbg.imglib.cursor.Cursor;
 import mpicbg.imglib.cursor.LocalizableCursor;
 import mpicbg.imglib.cursor.array.ArrayCursor;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.image.ImageFactory;
+import mpicbg.imglib.multithreading.Chunk;
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.imglib.outofbounds.OutOfBoundsStrategyMirrorFactory;
 import mpicbg.imglib.type.numeric.integer.UnsignedByteType;
 import mpicbg.imglib.type.numeric.integer.UnsignedShortType;
 import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.models.AbstractAffineModel3D;
+import mpicbg.models.AffineModel3D;
+import mpicbg.models.RigidModel3D;
+import mpicbg.models.TranslationModel3D;
 import mpicbg.models.InterpolatedAffineModel2D;
 import mpicbg.models.InterpolatedAffineModel3D;
 import mpicbg.models.InvertibleBoundable;
@@ -66,21 +71,20 @@ import mpicbg.models.PointMatch;
 import mpicbg.models.Tile;
 import mpicbg.models.TileConfiguration;
 import mpicbg.models.TranslationModel2D;
-import mpicbg.pointdescriptor.AbstractPointDescriptor;
-import mpicbg.pointdescriptor.ModelPointDescriptor;
-import mpicbg.pointdescriptor.SimplePointDescriptor;
-import mpicbg.pointdescriptor.exception.NoSuitablePointsException;
-import mpicbg.pointdescriptor.matcher.Matcher;
-import mpicbg.pointdescriptor.matcher.SubsetMatcher;
-import mpicbg.pointdescriptor.model.TranslationInvariantModel;
-import mpicbg.pointdescriptor.model.TranslationInvariantRigidModel2D;
-import mpicbg.pointdescriptor.model.TranslationInvariantRigidModel3D;
-import mpicbg.pointdescriptor.similarity.SimilarityMeasure;
-import mpicbg.pointdescriptor.similarity.SquareDistance;
-import mpicbg.spim.registration.ViewDataBeads;
-import mpicbg.spim.registration.ViewStructure;
-import mpicbg.spim.registration.bead.BeadRegistration;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.AbstractPointDescriptor;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.ModelPointDescriptor;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.SimplePointDescriptor;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.exception.NoSuitablePointsException;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.matcher.Matcher;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.matcher.SubsetMatcher;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.model.TranslationInvariantModel;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.model.TranslationInvariantRigidModel2D;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.model.TranslationInvariantRigidModel3D;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.similarity.SimilarityMeasure;
+import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.similarity.SquareDistance;
 import net.imglib2.util.Util;
+import net.preibisch.legacy.io.IOFunctions;
+import net.preibisch.mvrecon.Threads;
 import plugin.DescriptorParameters;
 import plugin.Descriptor_based_registration;
 import plugin.Descriptor_based_series_registration;
@@ -205,8 +209,8 @@ public class Matching
 				//IJ.log( "model2: " + model2 );
 				try
 				{
-					BeadRegistration.concatenateAxialScaling( (AbstractAffineModel3D<?>)model1, imp1.getCalibration().pixelDepth / imp1.getCalibration().pixelWidth );				
-					BeadRegistration.concatenateAxialScaling( (AbstractAffineModel3D<?>)model2, imp2.getCalibration().pixelDepth / imp2.getCalibration().pixelWidth );
+					concatenateAxialScaling( (AbstractAffineModel3D<?>)model1, imp1.getCalibration().pixelDepth / imp1.getCalibration().pixelWidth );
+					concatenateAxialScaling( (AbstractAffineModel3D<?>)model2, imp2.getCalibration().pixelDepth / imp2.getCalibration().pixelWidth );
 				}
 				catch (Exception e) 
 				{
@@ -378,7 +382,7 @@ public class Matching
 				try
 				{
 					for ( final InvertibleBoundable model : models )
-						BeadRegistration.concatenateAxialScaling( (AbstractAffineModel3D<?>)model, imp.getCalibration().pixelDepth / imp.getCalibration().pixelWidth );
+						concatenateAxialScaling( (AbstractAffineModel3D<?>)model, imp.getCalibration().pixelDepth / imp.getCalibration().pixelWidth );
 				}
 				catch (Exception e) 
 				{
@@ -1080,7 +1084,7 @@ public class Matching
 			}
 		}
 
-		ViewDataBeads.normalizeImage( img, minmax );
+		normalizeImage( img, minmax );
 
 		return img;
 	}
@@ -1409,8 +1413,119 @@ public class Matching
 			final boolean lookForMaxima, final boolean lookForMinima, final float threshold, final int localization, 
 			final int iterations, final double[] sigmaGuess, final int[] region ) // gaussian fit parameters
 	{
-		return DetectionSegmentation.extractBeadsLaPlaceImgLib( image, new OutOfBoundsStrategyMirrorFactory<FloatType>(), 0.5f, sigma1, sigma2, threshold, threshold/4, lookForMaxima, lookForMinima, 
-				localization, iterations, sigmaGuess, region, ViewStructure.DEBUG_MAIN );
+		return DetectionSegmentation.extractBeadsLaPlaceImgLib( image, new OutOfBoundsStrategyMirrorFactory<FloatType>(), 0.5f, sigma1, sigma2, threshold, threshold/4, lookForMaxima, lookForMinima,
+				localization, iterations, sigmaGuess, region, DetectionSegmentation.DEBUG_MAIN );
+	}
+
+	/**
+	 * Concatenates an axial (z) scaling to a 3D affine/rigid model, in-place. This is a local
+	 * reimplementation of the former {@code mpicbg.spim.registration.bead.BeadRegistration.concatenateAxialScaling},
+	 * which was removed when SPIM_Registration was superseded by multiview-reconstruction.
+	 *
+	 * @param model - the model to modify (must be an {@link AffineModel3D} or {@link RigidModel3D})
+	 * @param zStretching - the axial scaling factor (pixelDepth / pixelWidth)
+	 */
+	public static void concatenateAxialScaling( final AbstractAffineModel3D<?> model, final double zStretching )
+	{
+		if ( model != null )
+		{
+			if ( model instanceof AffineModel3D )
+			{
+				final AffineModel3D tmpModel = new AffineModel3D();
+				final float z = (float)zStretching;
+
+				tmpModel.set( 1f, 0f, 0f, 0f,
+				              0f, 1f, 0f, 0f,
+				              0f, 0f, z,  0f );
+
+				((AffineModel3D)model).concatenate( tmpModel );
+			}
+			else if ( model instanceof RigidModel3D )
+			{
+				final RigidModel3D tmpModel = new RigidModel3D();
+				final float z = (float)zStretching;
+
+				tmpModel.set( 1f, 0f, 0f, 0f,
+				              0f, 1f, 0f, 0f,
+				              0f, 0f, z,  0f );
+
+				((RigidModel3D)model).concatenate( tmpModel );
+			}
+			else if ( model instanceof TranslationModel3D )
+			{
+				IOFunctions.println( "Cannot concatenate Axial Scaling with TranslationModel3D, you can load the registration as Affine or Rigid model and run it then!" );
+			}
+			else
+			{
+				IOFunctions.println( "Cannot concatenate Axial Scaling, unknown model: " + model.getClass().getSimpleName() );
+			}
+		}
+	}
+
+	/**
+	 * Normalizes an imglib1 image in-place to the range [0, 1]. This is a local reimplementation of the
+	 * former {@code mpicbg.spim.registration.ViewDataBeads.normalizeImage}, which was removed when
+	 * SPIM_Registration was superseded by multiview-reconstruction.
+	 *
+	 * @param image - the image to normalize (modified in-place)
+	 * @param minmax - the min/max to map to [0, 1]; if null/too short the current display range is used
+	 * @return the original { min, max } that were mapped to { 0, 1 }
+	 */
+	public static float[] normalizeImage( final Image<FloatType> image, final float[] minmax )
+	{
+		if ( minmax == null || minmax.length < 2 )
+			image.getDisplay().setMinMax();
+		else
+			image.getDisplay().setMinMax( minmax[ 0 ], minmax[ 1 ] );
+
+		final float min = (float)image.getDisplay().getMin();
+		final float max = (float)image.getDisplay().getMax();
+		final float diff = max - min;
+
+		if ( Float.isNaN( diff ) || Float.isInfinite( diff ) || diff == 0 )
+		{
+			IOFunctions.println( "Cannot normalize image " + image.getName() + ", min=" + min + "  + max=" + max );
+			return new float[]{ min, max };
+		}
+
+		final Vector< Chunk > threadChunks = SimpleMultiThreading.divideIntoChunks( image.getNumPixels(), Threads.numThreads() );
+		final int numThreads = threadChunks.size();
+
+		final AtomicInteger ai = new AtomicInteger( 0 );
+		final Thread[] threads = SimpleMultiThreading.newThreads( numThreads );
+		for ( int ithread = 0; ithread < threads.length; ++ithread )
+			threads[ ithread ] = new Thread( new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					// Thread ID
+					final int myNumber = ai.getAndIncrement();
+
+					// get chunk of pixels to process
+					final Chunk myChunk = threadChunks.get( myNumber );
+					final long loopSize = myChunk.getLoopSize();
+
+					final Cursor< FloatType > cursor = image.createCursor();
+					cursor.fwd( myChunk.getStartPosition() );
+
+					for ( long l = 0; l < loopSize; ++l )
+					{
+						cursor.fwd();
+
+						final float value = cursor.getType().get();
+						final float norm = ( value - min ) / diff;
+
+						cursor.getType().set( norm );
+					}
+				}
+			} );
+
+		SimpleMultiThreading.startAndJoin( threads );
+
+		image.getDisplay().setMinMax( 0, 1 );
+
+		return new float[]{ min, max };
 	}
 
 	private static PrintWriter openFileWrite(final File file)

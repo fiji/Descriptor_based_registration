@@ -2,7 +2,7 @@
  * #%L
  * Fiji distribution of ImageJ for the life sciences.
  * %%
- * Copyright (C) 2011 - 2022 Fiji developers.
+ * Copyright (C) 2011 - 2026 Fiji developers.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
@@ -33,14 +33,19 @@ import mpicbg.imglib.image.Image;
 import mpicbg.imglib.outofbounds.OutOfBoundsStrategyFactory;
 import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.imglib.wrapper.ImgLib1;
-import mpicbg.spim.io.IOFunctions;
-import mpicbg.spim.registration.ViewStructure;
 import net.imglib2.RandomAccessible;
 import net.imglib2.view.Views;
-import spim.Threads;
+import net.preibisch.legacy.io.IOFunctions;
+import net.preibisch.mvrecon.Threads;
 
 public class DetectionSegmentation
 {
+	// Debug levels (formerly mpicbg.spim.registration.ViewStructure.DEBUG_*),
+	// kept here so logging verbosity behaves as before after the move to MVR 9.x.
+	public static final int DEBUG_ALL = 0;
+	public static final int DEBUG_MAIN = 1;
+	public static final int DEBUG_ERRORONLY = 2;
+
 	public static double distanceThreshold = 1.5;
 
 	public static ArrayList< DifferenceOfGaussianPeak< FloatType > > extractBeadsLaPlaceImgLib( 
@@ -96,7 +101,7 @@ public class DetectionSegmentation
 		
 		if ( !dog.checkInput() || !dog.process() )
 		{
-			if ( debugLevel <= ViewStructure.DEBUG_ERRORONLY )
+			if ( debugLevel <= DEBUG_ERRORONLY )
 				IOFunctions.println("(" + new Date(System.currentTimeMillis()) + "): Cannot compute difference of gaussian for " + dog.getErrorMessage() );
 			
 			return new ArrayList< DifferenceOfGaussianPeak< FloatType > >();
@@ -128,7 +133,7 @@ public class DetectionSegmentation
 			
 			if ( !spl.checkInput() || !spl.process() )
 			{
-				if ( debugLevel <= ViewStructure.DEBUG_ERRORONLY )
+				if ( debugLevel <= DEBUG_ERRORONLY )
 					IOFunctions.println("(" + new Date(System.currentTimeMillis()) + "): Warning! Failed to compute subpixel localization " + spl.getErrorMessage() );
 			}
 			
@@ -173,7 +178,7 @@ public class DetectionSegmentation
 					}
 				}
 			}
-			if ( debugLevel <= ViewStructure.DEBUG_ALL )
+			if ( debugLevel <= DEBUG_ALL )
 			{
 				IOFunctions.println( "number of peaks: " + dog.getPeaks().size() );
 				IOFunctions.println( "invalid: " + invalid );

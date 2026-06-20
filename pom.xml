@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.scijava</groupId>
 		<artifactId>pom-scijava</artifactId>
-		<version>33.2.0</version>
+		<version>44.0.0</version>
 		<relativePath />
 	</parent>
 
@@ -113,7 +113,13 @@
 		<license.licenseName>gpl_v3</license.licenseName>
 		<license.copyrightOwners>Fiji developers.</license.copyrightOwners>
 		<license.projectName>Fiji distribution of ImageJ for the life sciences.</license.projectName>
-		<SPIM_Registration.version>5.0.20</SPIM_Registration.version>
+
+		<scijava.jvm.version>21</scijava.jvm.version>
+		<scijava.javadoc.url.java>https://javadoc.scijava.org/Java21/</scijava.javadoc.url.java>
+		<legacyMode>true</legacyMode> <!-- NB: Make javadoc less strict about Java module system. -->
+
+		<!-- Pin to the just-released MVR (may be newer than what pom-scijava manages). -->
+		<multiview-reconstruction.version>9.0.1</multiview-reconstruction.version>
 
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>sign,deploy-to-scijava</releaseProfiles>
@@ -133,8 +139,8 @@
 			<artifactId>Fiji_Plugins</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>sc.fiji</groupId>
-			<artifactId>SPIM_Registration</artifactId>
+			<groupId>net.preibisch</groupId>
+			<artifactId>multiview-reconstruction</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>sc.fiji</groupId>
@@ -155,6 +161,18 @@
 		<dependency>
 			<groupId>mpicbg</groupId>
 			<artifactId>mpicbg</artifactId>
+		</dependency>
+
+		<!-- Pulled transitively (compile) via multiview-reconstruction -> bio-formats. Re-declared at
+		     runtime scope so it stays available at runtime but is off the compile/javadoc classpath: its
+		     jar has a class in the default package, which the javadoc tool cannot place on the JDK 9+
+		     module path ("Unable to derive module descriptor") during release. Mirrors the same fix in
+		     multiview-reconstruction (its runtime scope does not propagate to downstream consumers). -->
+		<dependency>
+			<groupId>ome</groupId>
+			<artifactId>turbojpeg</artifactId>
+			<version>${bio-formats.version}</version>
+			<scope>runtime</scope>
 		</dependency>
 	</dependencies>
 </project>

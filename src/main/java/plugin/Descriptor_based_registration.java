@@ -2,7 +2,7 @@
  * #%L
  * Fiji distribution of ImageJ for the life sciences.
  * %%
- * Copyright (C) 2011 - 2022 Fiji developers.
+ * Copyright (C) 2011 - 2026 Fiji developers.
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
@@ -21,14 +21,13 @@
  */
 package plugin;
 
-import fiji.plugin.Apply_External_Transformation;
-import fiji.plugin.Bead_Registration;
 import fiji.stacks.Hyperstack_rearranger;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.MultiLineLabel;
+import ij.plugin.ChannelSplitter;
 import ij.plugin.PlugIn;
 
 import mpicbg.imglib.multithreading.SimpleMultiThreading;
@@ -44,10 +43,13 @@ import mpicbg.models.SimilarityModel2D;
 import mpicbg.models.SimilarityModel3D;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
-import mpicbg.spim.segmentation.InteractiveDoG;
-import mpicbg.util.TransformUtils;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.HelperFunctions;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoG;
+import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoGParams;
+import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
+import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
+import net.preibisch.mvrecon.vecmath.Transform3D;
 import process.Matching;
-import spim.vecmath.Transform3D;
 
 public class Descriptor_based_registration implements PlugIn 
 {
@@ -103,7 +105,7 @@ public class Descriptor_based_registration implements PlugIn
 					   "Preibisch et al., Nature Methods (2010), 7(6):418-419\n" );
 
 		MultiLineLabel text =  (MultiLineLabel) gd.getMessage();
-		Bead_Registration.addHyperLinkListener( text, paperURL );
+		GUIHelper.addHyperLinkListener( text, paperURL );
 
 		gd.showDialog();
 		
@@ -202,6 +204,9 @@ public class Descriptor_based_registration implements PlugIn
 	public static int defaultDetectionType = detectionTypes.length - 1;
 	public static boolean defaultInteractiveMaxima = true;
 	public static boolean defaultInteractiveMinima = false;
+
+	// DoG steps-per-octave used to derive sigma2 from sigma1 (formerly InteractiveDoG.standardSensitivity).
+	public static final int defaultSensitivity = 4;
 	
 	public static String[] orientation = { "Not prealigned", "Approxmiately aligned", "I will provide the approximate alignment" };
 	public static int defaultSimilarOrientation = 0;
@@ -302,7 +307,7 @@ public class Descriptor_based_registration implements PlugIn
 		gd.addMessage("This Plugin is developed by Stephan Preibisch\n" + myURL);
 
 		MultiLineLabel text = (MultiLineLabel) gd.getMessage();
-		Bead_Registration.addHyperLinkListener(text, myURL);
+		GUIHelper.addHyperLinkListener(text, myURL);
 
 		gd.showDialog();
 		
@@ -479,15 +484,16 @@ public class Descriptor_based_registration implements PlugIn
 		{
 			// query parameters interactively
 			final double[] values = new double[]{ defaultSigma, defaultThreshold };
-			final InteractiveDoG idog = getInteractiveDoGParameters( imp1, channel1, values, 20 );
+			final InteractiveDoGParams idog = getInteractiveDoGParameters( imp1, channel1, values, 20 );
 
-			if ( idog.wasCanceled() )
+			// null means the user canceled the interactive DoG
+			if ( idog == null )
 				return null;
 
 			params.sigma1 = values[ 0 ];
 			params.threshold = values[ 1 ];
-			params.lookForMaxima = idog.getLookForMaxima();
-			params.lookForMinima = idog.getLookForMinima();
+			params.lookForMaxima = idog.findMaxima;
+			params.lookForMinima = idog.findMinima;
 		}
 		else 
 		{
@@ -545,7 +551,7 @@ public class Descriptor_based_registration implements PlugIn
 			defaultDetectionType = 0;
 		
 		// other parameters
-		params.sigma2 = InteractiveDoG.computeSigma2( (float)params.sigma1, InteractiveDoG.standardSensitivity );
+		params.sigma2 = HelperFunctions.computeSigma2( params.sigma1, defaultSensitivity );
 		if ( similarOrientation == 0 )
 			params.similarOrientation = false;
 		else
@@ -621,9 +627,9 @@ public class Descriptor_based_registration implements PlugIn
 				else
 					t3.rotZ( Math.toRadians( defaultDegrees3 ) );
 				
-				final AffineModel3D m1 = TransformUtils.getAffineModel3D( t1 );
-				final AffineModel3D m2 = TransformUtils.getAffineModel3D( t2 );
-				final AffineModel3D m3 = TransformUtils.getAffineModel3D( t3 );
+				final AffineModel3D m1 = TransformationTools.getAffineModel3D( t1 );
+				final AffineModel3D m2 = TransformationTools.getAffineModel3D( t2 );
+				final AffineModel3D m3 = TransformationTools.getAffineModel3D( t3 );
 
 				m1.preConcatenate( m2 );
 				m1.preConcatenate( m3 );
@@ -649,7 +655,7 @@ public class Descriptor_based_registration implements PlugIn
 				if ( gd2.wasCanceled() )
 					return null;
 
-				String entry = Apply_External_Transformation.removeSequences( gd2.getNextString().trim(), new String[] { "(", ")", "{", "}", "[", "]", "<", ">", ":", "m00", "m01", "m02", "m03", "m10", "m11", "m12", "m13", "m20", "m21", "m22", "m23", " " } );			
+				String entry = GUIHelper.removeSequences( gd2.getNextString().trim(), new String[] { "(", ")", "{", "}", "[", "]", "<", ">", ":", "m00", "m01", "m02", "m03", "m10", "m11", "m12", "m13", "m20", "m21", "m22", "m23", " " } );			
 				final String[] numbers = entry.split( "," );
 				
 				if  ( numbers.length != 12 )
@@ -695,7 +701,7 @@ public class Descriptor_based_registration implements PlugIn
 				if ( gd2.wasCanceled() )
 					return null;
 
-				String entry = Apply_External_Transformation.removeSequences( gd2.getNextString().trim(), new String[] { "(", ")", "{", "}", "[", "]", "<", ">", ":", "m00", "m01", "m02", "m03", "m10", "m11", "m12", "m13", "m20", "m21", "m22", "m23", " " } );			
+				String entry = GUIHelper.removeSequences( gd2.getNextString().trim(), new String[] { "(", ")", "{", "}", "[", "]", "<", ">", ":", "m00", "m01", "m02", "m03", "m10", "m11", "m12", "m13", "m20", "m21", "m22", "m23", " " } );			
 				final String[] numbers = entry.split( "," );
 				
 				if  ( numbers.length != 6 )
@@ -736,7 +742,7 @@ public class Descriptor_based_registration implements PlugIn
 				if ( gd2.wasCanceled() )
 					return null;
 
-				String entry = Apply_External_Transformation.removeSequences( gd2.getNextString().trim(), new String[] { "(", ")", "{", "}", "[", "]", "<", ">", ":", "m00", "m01", "m02", "m03", "m10", "m11", "m12", "m13", "m20", "m21", "m22", "m23", " " } );			
+				String entry = GUIHelper.removeSequences( gd2.getNextString().trim(), new String[] { "(", ")", "{", "}", "[", "]", "<", ">", ":", "m00", "m01", "m02", "m03", "m10", "m11", "m12", "m13", "m20", "m21", "m22", "m23", " " } );			
 				final String[] numbers = entry.split( "," );
 				
 				if  ( numbers.length != 9 )
@@ -828,65 +834,89 @@ public class Descriptor_based_registration implements PlugIn
 	
 	/**
 	 * Can be called with values[ 3 ], i.e. [initialsigma, sigma2, threshold] or
-	 * values[ 2 ], i.e. [initialsigma, threshold]
-	 * 
+	 * values[ 2 ], i.e. [initialsigma, threshold].
+	 *
 	 * The results are stored in the same array.
-	 * If called with values[ 2 ], sigma2 changing will be disabled
-	 * 
-	 * @param values - the initial values and also contains the result
-	 * @param sigmaMax - the maximal sigma allowed by the interactive app
-	 * @return {@link InteractiveDoG} - the instance for querying additional parameters
+	 *
+	 * Adapted to the rewritten interactive DoG of multiview-reconstruction 9.x
+	 * ({@link InteractiveDoG} + {@link InteractiveDoGParams}): the GUI exposes only sigma,
+	 * threshold and look-for-maxima/minima, and reports the result back through the params object.
+	 *
+	 * NB: the new GUI uses a fixed sigma slider range (see {@code InteractiveDoG.sigmaMax}); the
+	 * {@code sigmaMax} argument is no longer honored. sigma2 is always derived from sigma1.
+	 *
+	 * @param imp - the image to detect on (must be displayed; its window provides the preview canvas)
+	 * @param channel - the channel (0-based) to run the interactive detection on
+	 * @param values - the initial values; on success it also receives the result
+	 * @param sigmaMax - kept for source compatibility; no longer honored by the new GUI
+	 * @return the {@link InteractiveDoGParams} with the chosen parameters, or {@code null} if canceled
 	 */
-	public static InteractiveDoG getInteractiveDoGParameters( final ImagePlus imp, final int channel, final double values[], final float sigmaMax )
+	public static InteractiveDoGParams getInteractiveDoGParameters( final ImagePlus imp, final int channel, final double values[], final float sigmaMax )
 	{
-		 if ( imp.isDisplayedHyperStack() )
-             imp.setPosition( imp.getStackIndex( channel + 1, imp.getNSlices() / 2 + 1 , 1 ) );
-         else
-             imp.setSlice( imp.getStackIndex( channel + 1, imp.getNSlices() / 2 + 1 , 1 ) );
-		 
-		imp.setRoi( 0, 0, imp.getWidth()/3, imp.getHeight()/3 );		
-		
-		final InteractiveDoG idog = new InteractiveDoG( imp, channel );
-		idog.setSigmaMax( sigmaMax );
-		idog.setLookForMaxima( defaultInteractiveMaxima );
-		idog.setLookForMinima( defaultInteractiveMinima );
-		
-		if ( values.length == 2 )
+		// The rewritten InteractiveDoG wraps the whole ImagePlus (it has no channel argument), so for a
+		// multi-channel image we run the preview on a single-channel copy of the requested channel.
+		final ImagePlus impPreview;
+		final boolean closePreview;
+
+		if ( imp.getNChannels() > 1 )
 		{
-			idog.setSigma2isAdjustable( false );
-			idog.setInitialSigma( (float)values[ 0 ] );
-			idog.setThreshold( (float)values[ 1 ] );
+			impPreview = new ImagePlus( imp.getTitle() + " (channel " + ( channel + 1 ) + ")", ChannelSplitter.getChannel( imp, channel + 1 ) );
+			impPreview.setCalibration( imp.getCalibration() );
+			impPreview.show();
+			closePreview = true;
 		}
 		else
 		{
-			idog.setInitialSigma( (float)values[ 0 ] );
-			idog.setThreshold( (float)values[ 2 ] );			
+			impPreview = imp;
+			closePreview = false;
 		}
-		
-		idog.run( null );
-		
+
+		// show the middle slice and a preview ROI in the upper-left corner
+		impPreview.setSlice( Math.max( 1, impPreview.getStackSize() / 2 + 1 ) );
+		impPreview.setRoi( 0, 0, impPreview.getWidth() / 3, impPreview.getHeight() / 3 );
+
+		final InteractiveDoGParams params = new InteractiveDoGParams();
+		params.findMaxima = defaultInteractiveMaxima;
+		params.findMinima = defaultInteractiveMinima;
+
+		// values[ 2 ] -> [initialsigma, threshold]; values[ 3 ] -> [initialsigma, sigma2, threshold]
+		params.sigma = values[ 0 ];
+		params.threshold = values.length == 2 ? values[ 1 ] : values[ 2 ];
+
+		// the rewritten InteractiveDoG requires an explicit (non-NaN) intensity range for the preview
+		impPreview.resetDisplayRange();
+		final double min = impPreview.getDisplayRangeMin();
+		final double max = impPreview.getDisplayRangeMax();
+
+		final InteractiveDoG idog = new InteractiveDoG( impPreview, params, min, max );
+
 		while ( !idog.isFinished() )
 			SimpleMultiThreading.threadWait( 100 );
-		
-		if ( values.length == 2)
+
+		// remove the roi (and the temporary preview image, if any)
+		impPreview.killRoi();
+		if ( closePreview )
+			impPreview.close();
+
+		if ( idog.wasCanceled() )
+			return null;
+
+		if ( values.length == 2 )
 		{
-			values[ 0 ] = idog.getInitialSigma();
-			values[ 1 ] = idog.getThreshold();
+			values[ 0 ] = params.sigma;
+			values[ 1 ] = params.threshold;
 		}
 		else
 		{
-			values[ 0 ] = idog.getInitialSigma();
-			values[ 1 ] = idog.getSigma2();						
-			values[ 2 ] = idog.getThreshold();
+			values[ 0 ] = params.sigma;
+			values[ 1 ] = HelperFunctions.computeSigma2( params.sigma, idog.sensitivity );
+			values[ 2 ] = params.threshold;
 		}
-		
-		// remove the roi
-		imp.killRoi();
-		
-		defaultInteractiveMaxima = idog.getLookForMaxima();
-		defaultInteractiveMinima = idog.getLookForMinima();
-		
-		return idog;
+
+		defaultInteractiveMaxima = params.findMaxima;
+		defaultInteractiveMinima = params.findMinima;
+
+		return params;
 	}
 	
 	public static String testRegistrationCompatibility( final ImagePlus imp1, final ImagePlus imp2 ) 
