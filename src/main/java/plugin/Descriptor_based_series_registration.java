@@ -21,7 +21,9 @@
  */
 package plugin;
 
+import net.preibisch.mvrecon.fiji.plugin.interestpointregistration.pairwise.PairwiseGUI;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
+import net.preibisch.mvrecon.process.interestpointregistration.pairwise.methods.ransac.RANSACParameters;
 import fiji.stacks.Hyperstack_rearranger;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
@@ -243,6 +245,14 @@ public class Descriptor_based_series_registration implements PlugIn
 	public static String[] globalOptTypes = { "All-to-all matching (global optimization)", "All-to-all matching with range ('reasonable' global optimization)", "All against first image (no global optimization)", "Consecutive matching of images (no global optimization)" };
 	public static int defaultGlobalOpt = 1;
 	public static int defaultRange = 5;
+
+	// advanced parameters for the global optimization (mpicbg TileConfiguration.optimize); the defaults match the previously hard-coded values
+	public static boolean defaultAdvancedGlobalOpt = false;
+	public static double defaultGlobalOptMaxError = 10;
+	public static int defaultGlobalOptMaxIterations = 10000;
+	public static int defaultGlobalOptMaxPlateauwidth = 200;
+
+	public static String[] minMaxChoices = { "Compute local values (for each volume/slice)", "Compute global values (for all volumes/slices)", "User defined (for all volumes/slices)" };
 	
 	public static int defaultChannel = 1;
 	
@@ -296,7 +306,8 @@ public class Descriptor_based_series_registration implements PlugIn
 		gd.addChoice( "Approximate_size of detections", detectionSize, detectionSize[ defaultDetectionSize ] );
 		gd.addChoice( "Type_of_detections", detectionTypes, detectionTypes[ defaultDetectionType ] );
 		gd.addChoice( "Subpixel_Localization", localizationChoice, localizationChoice[ defaultLocalization ] );
-		
+		gd.addChoice( "Intensity (min/max)", minMaxChoices, minMaxChoices[ DescriptorParameters.minMaxType ] );
+
 		gd.addChoice( "Transformation_model", transformationModel, transformationModel[ defaultTransformationModel ] );
 		gd.addCheckbox( "Regularize_model", defaultRegularize );
 		gd.addCheckbox( "Images_are_roughly_aligned", defaultSimilarOrientation );
@@ -317,9 +328,10 @@ public class Descriptor_based_series_registration implements PlugIn
 		}
 		gd.addSlider( "Redundancy for descriptor matching", 0, 10, defaultRedundancy );		
 		gd.addSlider( "Significance required for a descriptor match", 1.0, 10.0, defaultSignificance );
-		gd.addSlider( "Allowed_error_for_RANSAC (px)", 0.5, 20.0, defaultRansacThreshold );
+		PairwiseGUI.addRansacQuery( gd );
 		gd.addChoice( "Global_optimization", globalOptTypes, globalOptTypes[ defaultGlobalOpt ] );
 		gd.addSlider( "Range for all-to-all matching", 2, 10, defaultRange );
+		gd.addCheckbox( "Advanced_global_optimization_parameters", defaultAdvancedGlobalOpt );
 		final int numChannels = imp.getNChannels();
 		
 		if ( defaultChannel > numChannels )
@@ -348,6 +360,7 @@ public class Descriptor_based_series_registration implements PlugIn
 		final int detectionSizeIndex = gd.getNextChoiceIndex();
 		final int detectionTypeIndex = gd.getNextChoiceIndex();
 		final int localization = gd.getNextChoiceIndex();
+		final int minMaxTypeIndex = gd.getNextChoiceIndex();
 
 		final int transformationModelIndex = gd.getNextChoiceIndex();
 		final boolean regularize = gd.getNextBoolean();
@@ -355,9 +368,14 @@ public class Descriptor_based_series_registration implements PlugIn
 		final int numNeighbors = (int)Math.round( gd.getNextNumber() );
 		final int redundancy = (int)Math.round( gd.getNextNumber() );
 		final double significance = gd.getNextNumber();
-		final double ransacThreshold = gd.getNextNumber();
+		final RANSACParameters ransacParameters = PairwiseGUI.parseRansacQuery( gd );
+		if ( ransacParameters == null ) // advanced RANSAC sub-dialog canceled
+			return null;
+		DescriptorParameters.ransacParameters = ransacParameters;
+		final double ransacThreshold = ransacParameters.getMaxEpsilon();
 		final int globalOptIndex = gd.getNextChoiceIndex();
 		final int range = (int)Math.round( gd.getNextNumber() );
+		final boolean advancedGlobalOpt = gd.getNextBoolean();
 		// zero-offset channel
 		final int channel = (int)Math.round( gd.getNextNumber() ) - 1;
 		final int result = gd.getNextChoiceIndex();
@@ -380,6 +398,54 @@ public class Descriptor_based_series_registration implements PlugIn
 		defaultChannel = channel + 1;
 		defaultResult = result;
 		defaultInterpolation = interpolation;
+
+		// resolve the intensity min/max mode (default = local, i.e. the previous behaviour)
+		DescriptorParameters.minMaxType = minMaxTypeIndex;
+
+		if ( DescriptorParameters.minMaxType == 2 )
+		{
+			final GenericDialog gdMinMax = new GenericDialog( "Define intensity min/max" );
+			gdMinMax.addNumericField( "Min_intensity", DescriptorParameters.min, 4 );
+			gdMinMax.addNumericField( "Max_intensity", DescriptorParameters.max, 4 );
+			gdMinMax.showDialog();
+
+			if ( gdMinMax.wasCanceled() )
+				return null;
+
+			DescriptorParameters.min = gdMinMax.getNextNumber();
+			DescriptorParameters.max = gdMinMax.getNextNumber();
+
+			params.minmax = new float[]{ (float)DescriptorParameters.min, (float)DescriptorParameters.max };
+		}
+		else if ( DescriptorParameters.minMaxType == 1 )
+		{
+			// compute the global min/max once (multi-threaded), reused by both the interactive preview and the detection
+			params.minmax = Matching.computeMinMax( imp, channel );
+			IJ.log( "Global intensity min=" + params.minmax[ 0 ] + ", max=" + params.minmax[ 1 ] );
+		}
+
+		// advanced global optimization parameters (otherwise the previous defaults are used)
+		defaultAdvancedGlobalOpt = advancedGlobalOpt;
+
+		if ( advancedGlobalOpt )
+		{
+			final GenericDialog gdGlobalOpt = new GenericDialog( "Advanced global optimization parameters" );
+			gdGlobalOpt.addNumericField( "Maximal_allowed_error (px)", defaultGlobalOptMaxError, 4 );
+			gdGlobalOpt.addNumericField( "Maximal_number_of_iterations", defaultGlobalOptMaxIterations, 0 );
+			gdGlobalOpt.addNumericField( "Maximal_plateau_width", defaultGlobalOptMaxPlateauwidth, 0 );
+			gdGlobalOpt.showDialog();
+
+			if ( gdGlobalOpt.wasCanceled() )
+				return null;
+
+			defaultGlobalOptMaxError = gdGlobalOpt.getNextNumber();
+			defaultGlobalOptMaxIterations = (int)Math.round( gdGlobalOpt.getNextNumber() );
+			defaultGlobalOptMaxPlateauwidth = (int)Math.round( gdGlobalOpt.getNextNumber() );
+
+			params.globalOptMaxError = defaultGlobalOptMaxError;
+			params.globalOptMaxIterations = defaultGlobalOptMaxIterations;
+			params.globalOptMaxPlateauwidth = defaultGlobalOptMaxPlateauwidth;
+		}
 
 		// instantiate model
 		if ( dimensionality == 2 )
@@ -523,22 +589,48 @@ public class Descriptor_based_series_registration implements PlugIn
 		{
 			// query parameters interactively
 			final double[] values = new double[]{ defaultSigma, defaultThreshold };
-			
+
+			// ask which timepoint (and, for 2d, which z-slice) to use for the interactive preview
+			final boolean askZ = ( dimensionality == 2 && imp.getNSlices() > 1 );
+			final boolean askT = ( imp.getNFrames() > 1 );
+
+			int previewZ = Math.max( 1, imp.getNSlices() / 2 + 1 ); // central z slice (1-based)
+			int previewT = Math.max( 1, imp.getNFrames() / 2 + 1 ); // central timepoint (1-based)
+
+			if ( askZ || askT )
+			{
+				final GenericDialog gdSlice = new GenericDialog( "Interactive detection: choose preview" );
+				if ( askZ )
+					gdSlice.addSlider( "Z_slice_for_interactive_detection", 1, imp.getNSlices(), previewZ );
+				if ( askT )
+					gdSlice.addSlider( "Timepoint_for_interactive_detection", 1, imp.getNFrames(), previewT );
+				gdSlice.showDialog();
+
+				if ( gdSlice.wasCanceled() )
+					return null;
+
+				if ( askZ )
+					previewZ = (int)Math.round( gdSlice.getNextNumber() );
+				if ( askT )
+					previewT = (int)Math.round( gdSlice.getNextNumber() );
+			}
+
 			final ImagePlus interactiveTmp;
-			
+
 			if ( dimensionality == 2 )
 			{
-				interactiveTmp = new ImagePlus( "First slice of " + imp.getTitle(), imp.getStack().getProcessor( imp.getStackIndex( channel + 1, 1, 1 ) ) );
+				interactiveTmp = new ImagePlus( "Slice " + previewZ + ", timepoint " + previewT + " of " + imp.getTitle(), imp.getStack().getProcessor( imp.getStackIndex( channel + 1, previewZ, previewT ) ) );
 			}
 			else
 			{
 				ImageStack stack = new ImageStack( imp.getWidth(), imp.getHeight() );
 				for ( int s = 1; s <= imp.getNSlices(); ++s )
-					stack.addSlice( "", imp.getStack().getProcessor( imp.getStackIndex( channel + 1, s, 1 ) ) );
-				interactiveTmp = new ImagePlus( "First series of " + imp.getTitle(), stack );
+					stack.addSlice( "", imp.getStack().getProcessor( imp.getStackIndex( channel + 1, s, previewT ) ) );
+				interactiveTmp = new ImagePlus( "Timepoint " + previewT + " of " + imp.getTitle(), stack );
 			}
 			interactiveTmp.show();
-			final InteractiveDoGParams idog = Descriptor_based_registration.getInteractiveDoGParameters( interactiveTmp, 0, values, 20 );
+			// use the same intensity range as the actual detection so the tuned threshold transfers correctly
+			final InteractiveDoGParams idog = Descriptor_based_registration.getInteractiveDoGParameters( interactiveTmp, 0, values, 20, params.minmax );
 			interactiveTmp.close();
 
 			// null means the user canceled the interactive DoG

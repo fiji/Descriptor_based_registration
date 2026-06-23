@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -84,7 +85,12 @@ import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.similarity.Simil
 import net.preibisch.mvrecon.process.pointcloud.pointdescriptor.similarity.SquareDistance;
 import net.imglib2.util.Util;
 import net.preibisch.legacy.io.IOFunctions;
+import net.preibisch.legacy.mpicbg.PointMatchGeneric;
 import net.preibisch.mvrecon.Threads;
+import net.preibisch.mvrecon.fiji.ImgLib2Temp.Pair;
+import net.preibisch.mvrecon.fiji.spimdata.interestpoints.InterestPoint;
+import net.preibisch.mvrecon.process.interestpointregistration.pairwise.methods.ransac.RANSAC;
+import net.preibisch.mvrecon.process.interestpointregistration.pairwise.methods.ransac.RANSACParameters;
 import plugin.DescriptorParameters;
 import plugin.Descriptor_based_registration;
 import plugin.Descriptor_based_series_registration;
@@ -115,9 +121,41 @@ public class Matching
 
 		if ( !params.reApply )
 		{
+			// resolve the intensity normalization range per image (local == null, global == computed per image, or user-defined)
+			final float[] minmax1, minmax2;
+
+			if ( params.minmax != null || params.minmax2 != null ) // resolved by the dialog (computed only once)
+			{
+				minmax1 = params.minmax;
+				minmax2 = params.minmax2;
+			}
+			else if ( DescriptorParameters.minMaxType == 1 )
+			{
+				minmax1 = computeMinMax( imp1, params.channel1 );
+				minmax2 = computeMinMax( imp2, params.channel2 );
+			}
+			else if ( DescriptorParameters.minMaxType == 2 )
+			{
+				minmax1 = new float[]{ (float)DescriptorParameters.min, (float)DescriptorParameters.max };
+				minmax2 = new float[]{ (float)DescriptorParameters.min2, (float)DescriptorParameters.max2 };
+			}
+			else
+			{
+				minmax1 = null;
+				minmax2 = null;
+			}
+
+			if ( !params.silent )
+			{
+				if ( minmax1 != null )
+					IJ.log( imp1.getTitle() + ": min=" + minmax1[ 0 ] + ", max=" + minmax1[ 1 ] );
+				if ( minmax2 != null )
+					IJ.log( imp2.getTitle() + ": min=" + minmax2[ 0 ] + ", max=" + minmax2[ 1 ] );
+			}
+
 			// get the peaks
-			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks1 = extractCandidates( imp1, params.channel1, 0, params, null );
-			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks2 = extractCandidates( imp2, params.channel2, 0, params, null );
+			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks1 = extractCandidates( imp1, params.channel1, 0, params, minmax1 );
+			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks2 = extractCandidates( imp2, params.channel2, 0, params, minmax2 );
 	
 			// filter for ROI
 			final int size1 = peaks1.size();
@@ -248,9 +286,11 @@ public class Matching
 			// get the peaks
 			final ArrayList<ArrayList<DifferenceOfGaussianPeak<FloatType>>> peaksComplete = new ArrayList<ArrayList<DifferenceOfGaussianPeak<FloatType>>>();
 
-			float[] minmax;
+			final float[] minmax;
 
-			if ( DescriptorParameters.minMaxType == 0 )
+			if ( params.minmax != null ) // resolved by the dialog (computed only once)
+				minmax = params.minmax;
+			else if ( DescriptorParameters.minMaxType == 0 )
 				minmax = null;
 			else if ( DescriptorParameters.minMaxType == 1 )
 				minmax = computeMinMax( imp, params.channel1 );
@@ -575,9 +615,12 @@ public class Matching
 			// compute an approximate correct orientation (this is important for all models execpt translation and affine!, they might not converge otherwise)
 			// which models have already an approximate location
 			tc.preAlign( );
-			
+
+			if ( !params.silent )
+				IJ.log( "Global optimization: maxError=" + params.globalOptMaxError + " px, maxIterations=" + params.globalOptMaxIterations + ", maxPlateauwidth=" + params.globalOptMaxPlateauwidth );
+
 			// compute the global optimum
-			tc.optimize( 10, 10000, 200 );			
+			tc.optimize( (float)params.globalOptMaxError, params.globalOptMaxIterations, params.globalOptMaxPlateauwidth );
 		}
 		catch ( Exception e )
 		{
@@ -883,35 +926,77 @@ public class Matching
 		}		
 	}
 
+	/**
+	 * Computes the global intensity min/max over all slices and frames of the given (zero-based) channel.
+	 * The work is distributed over all available threads, one (z,t) plane per task.
+	 */
 	public static float[] computeMinMax( final ImagePlus imp, final int channel )
 	{
 		final int size = imp.getWidth() * imp.getHeight();
-		float min = Float.MAX_VALUE;
-		float max = -Float.MAX_VALUE;
 
-		IJ.log( "Computing min/max over " + imp.getNSlices() + " slices and " + imp.getNFrames() + " frames for channel " + channel );
+		IJ.log( "Computing min/max over " + imp.getNSlices() + " slices and " + imp.getNFrames() + " frames for channel " + ( channel + 1 ) );
 
+		// the 1-based stack indices of all (z,t) planes to scan for this channel
+		final int[] stackIndices = new int[ imp.getNSlices() * imp.getNFrames() ];
+		int idx = 0;
 		for ( int z = 0; z < imp.getNSlices(); ++z )
 			for ( int t = 0; t < imp.getNFrames(); ++t )
-			{
-				final ImageProcessor ip = imp.getStack().getProcessor( imp.getStackIndex( channel, z + 1, t + 1 ) );
+				stackIndices[ idx++ ] = imp.getStackIndex( channel + 1, z + 1, t + 1 );
 
-				for ( int i = 0; i < size; ++i )
+		final AtomicInteger ai = new AtomicInteger( 0 );
+		final Thread[] threads = SimpleMultiThreading.newThreads();
+		final int numThreads = threads.length;
+
+		final float[] mins = new float[ numThreads ];
+		final float[] maxs = new float[ numThreads ];
+
+		for ( int ithread = 0; ithread < numThreads; ++ithread )
+			threads[ ithread ] = new Thread( new Runnable()
+			{
+				@Override
+				public void run()
 				{
-					final float f = ip.getf( i );
-					min = Math.min( min, f );
-					max = Math.max( max, f );
+					final int myNumber = ai.getAndIncrement();
+					float min = Float.MAX_VALUE;
+					float max = -Float.MAX_VALUE;
+
+					for ( int s = 0; s < stackIndices.length; ++s )
+						if ( s % numThreads == myNumber )
+						{
+							final ImageProcessor ip = imp.getStack().getProcessor( stackIndices[ s ] );
+
+							for ( int i = 0; i < size; ++i )
+							{
+								final float f = ip.getf( i );
+								if ( f < min ) min = f;
+								if ( f > max ) max = f;
+							}
+						}
+
+					mins[ myNumber ] = min;
+					maxs[ myNumber ] = max;
 				}
-			}
+			} );
+
+		SimpleMultiThreading.startAndJoin( threads );
+
+		float min = Float.MAX_VALUE;
+		float max = -Float.MAX_VALUE;
+		for ( int i = 0; i < numThreads; ++i )
+		{
+			min = Math.min( min, mins[ i ] );
+			max = Math.max( max, maxs[ i ] );
+		}
 
 		return new float[]{ min, max };
 	}
-	
+
 	public static ArrayList<DifferenceOfGaussianPeak<FloatType>> extractCandidates( final ImagePlus imp, final int channel, final int timepoint, final DescriptorParameters params, final float[] minmax )
 	{
-		// get the input images for registration
-		final Image<FloatType> img = convertToFloat( imp, channel, timepoint, minmax );
-		
+		// get the input images for registration (capturing the intensity min/max actually applied)
+		final float[] minmaxUsed = new float[ 2 ];
+		final Image<FloatType> img = convertToFloat( imp, channel, timepoint, minmax, minmaxUsed );
+
 		// extract Calibrations
 		final Calibration cal = imp.getCalibration();
 		
@@ -927,7 +1012,9 @@ public class Matching
 		// remove invalid peaks
 		final int[] stats1 = removeInvalidAndCollectStatistics( peaks );
 
-		String statement = "Found " + peaks.size() + " candidates for " + imp.getTitle() + " [" + timepoint + "] (" + stats1[ 1 ] + " maxima, " + stats1[ 0 ] + " minima)";
+		final String minMaxType = ( minmax == null ) ? "local" : ( DescriptorParameters.minMaxType == 2 ? "user-defined" : "global" );
+		String statement = "Found " + peaks.size() + " candidates for " + imp.getTitle() + " [" + timepoint + "] (" + stats1[ 1 ] + " maxima, " + stats1[ 0 ] + " minima)" +
+				" [intensity min/max (" + minMaxType + "): " + minmaxUsed[ 0 ] + " / " + minmaxUsed[ 1 ] + "]";
 
 		// filter strongest detections
 		if ( DescriptorParameters.brightestNPoints > 0 )
@@ -980,6 +1067,15 @@ public class Matching
 	 * @return - the normalized copy [0...1]
 	 */
 	public static Image<FloatType> convertToFloat( final ImagePlus imp, int channel, int timepoint, final float[] minmax )
+	{
+		return convertToFloat( imp, channel, timepoint, minmax, null );
+	}
+
+	/**
+	 * @param minmaxUsed - if non-null (length &gt;= 2), is filled with the intensity min/max actually applied for
+	 *        normalization (the auto-computed per-image range when {@code minmax == null}, otherwise {@code minmax}).
+	 */
+	public static Image<FloatType> convertToFloat( final ImagePlus imp, int channel, int timepoint, final float[] minmax, final float[] minmaxUsed )
 	{
 		// stupid 1-offset of imagej
 		channel++;
@@ -1084,7 +1180,13 @@ public class Matching
 			}
 		}
 
-		normalizeImage( img, minmax );
+		final float[] applied = normalizeImage( img, minmax );
+
+		if ( minmaxUsed != null && minmaxUsed.length >= 2 )
+		{
+			minmaxUsed[ 0 ] = applied[ 0 ];
+			minmaxUsed[ 1 ] = applied[ 1 ];
+		}
 
 		return img;
 	}
@@ -1155,42 +1257,56 @@ public class Matching
 	}
 	
 	protected static String computeRANSAC( final ArrayList<PointMatch> candidates, final ArrayList<PointMatch> inliers, final Model<?> model, final float maxEpsilon )
-	{		
-		boolean modelFound = false;
-		float minInlierRatio = DescriptorParameters.minInlierRatio;
-		int numIterations = DescriptorParameters.ransacIterations;
-		float maxTrust = DescriptorParameters.maxTrust;
-		float minInlierFactor = DescriptorParameters.minInlierFactor;
-		
+	{
+		final RANSACParameters rp = DescriptorParameters.ransacParameters;
+		final float minInlierFactor = DescriptorParameters.minInlierFactor;
+
+		inliers.clear();
+
 		try
 		{
-			if ( DescriptorParameters.filterRANSAC )
+			// adapt mpicbg PointMatch<Particle> into MVR PointMatchGeneric<InterestPoint>, keeping an
+			// identity map back to the original Particles so we can return them as inliers afterwards.
+			// IMPORTANT: preserve BOTH local (l) and world (w) coordinates - the model fit maps p1.l -> p2.w,
+			// so a plain new InterestPoint(id, l) (which forces w = l) would corrupt the target coordinate.
+			final ArrayList< PointMatchGeneric< InterestPoint > > mvrCandidates = new ArrayList<>();
+			final IdentityHashMap< InterestPoint, Particle > toParticle = new IdentityHashMap<>();
+			int id = 0;
+
+			for ( final PointMatch pm : candidates )
 			{
-				modelFound = model.filterRansac(
-						candidates,
-						inliers,
-						numIterations,
-						maxEpsilon, minInlierRatio, maxTrust );				
-				
+				final Particle pa = (Particle)pm.getP1();
+				final Particle pb = (Particle)pm.getP2();
+				final InterestPoint ia = toInterestPoint( id++, pa );
+				final InterestPoint ib = toInterestPoint( id++, pb );
+				toParticle.put( ia, pa );
+				toParticle.put( ib, pb );
+				mvrCandidates.add( new PointMatchGeneric< InterestPoint >( ia, ib ) );
 			}
-			else
+
+			// run MVR's RANSAC (adds inconsistent-match removal and optional multi-consensus)
+			final ArrayList< PointMatchGeneric< InterestPoint > > mvrInliers = new ArrayList<>();
+			final ArrayList< Integer > setIds = new ArrayList<>();
+
+			final Pair< String, Double > result = RANSAC.computeRANSAC(
+					mvrCandidates, mvrInliers, setIds, model,
+					maxEpsilon, rp.getMinInlierRatio(), rp.getMinNumMatches(), rp.getNumIterations(),
+					rp.multiConsensus(), rp.getMaxTrust(), rp.getFilterRansac() );
+
+			// combine the inliers of all consensus sets (mapped back to the original Particles)
+			for ( final PointMatchGeneric< InterestPoint > pm : mvrInliers )
+				inliers.add( new PointMatch( toParticle.get( pm.getPoint1() ), toParticle.get( pm.getPoint2() ) ) );
+
+			if ( inliers.size() > model.getMinNumMatches() * minInlierFactor )
 			{
-				modelFound = model.ransac(
-						candidates,
-						inliers,
-						numIterations,
-						maxEpsilon, minInlierRatio );
-			}		
-			
-			if ( modelFound && inliers.size() > model.getMinNumMatches() * minInlierFactor )
-			{
+				// (re-)fit the single model on the combined inliers; matters when multi-consensus returned >1 set
 				model.fit( inliers );
-				return "Remaining inliers after RANSAC (" + model.getClass().getSimpleName() + "): " + inliers.size() + " of " + candidates.size() + " with average error " + model.getCost();
+				return "Remaining inliers after RANSAC (" + model.getClass().getSimpleName() + "): " + inliers.size() + " of " + candidates.size() + " with average error " + model.getCost() + " [" + result.getA() + "]";
 			}
 			else
 			{
 				inliers.clear();
-				return "NO Model found after RANSAC (" + model.getClass().getSimpleName() + ") of " + candidates.size();
+				return "NO Model found after RANSAC (" + model.getClass().getSimpleName() + ") of " + candidates.size() + " [" + result.getA() + "]";
 			}
 		}
 		catch ( Exception e )
@@ -1200,7 +1316,22 @@ public class Matching
 		}
 	}
 
-	protected static ArrayList<PointMatch> getCorrespondenceCandidates( final double nTimesBetter, final Matcher matcher, 
+	/**
+	 * Builds an MVR {@link InterestPoint} that carries the same local (l) AND world (w) coordinates as the
+	 * given {@link Particle}. {@code new InterestPoint(id, l)} alone would set w = l, which is wrong because
+	 * RANSAC / the model fit maps p1.getL() -> p2.getW().
+	 */
+	private static InterestPoint toInterestPoint( final int id, final Particle p )
+	{
+		final InterestPoint ip = new InterestPoint( id, p.getL().clone() );
+		final double[] w = ip.getW();
+		final double[] pw = p.getW();
+		for ( int d = 0; d < w.length; ++d )
+			w[ d ] = pw[ d ];
+		return ip;
+	}
+
+	protected static ArrayList<PointMatch> getCorrespondenceCandidates( final double nTimesBetter, final Matcher matcher,
 			ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks1, ArrayList<DifferenceOfGaussianPeak<FloatType>> peaks2, 
 			final Model<?> model, final int dimensionality, final float zStretching1, final float zStretching2, String explanation )
 	{

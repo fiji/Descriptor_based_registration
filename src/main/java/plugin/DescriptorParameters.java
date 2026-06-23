@@ -30,19 +30,17 @@ import mpicbg.models.InvertibleBoundable;
 import mpicbg.models.PointMatch;
 import mpicbg.models.TranslationModel2D;
 import mpicbg.models.TranslationModel3D;
+import net.preibisch.mvrecon.process.interestpointregistration.pairwise.methods.ransac.RANSACParameters;
 
 public class DescriptorParameters 
 {	
 	/**
-	 * How many iterations for a RANSAC
+	 * All RANSAC parameters (max epsilon, min inlier ratio, min num matches, iterations, multi-consensus,
+	 * max trust, filter-RANSAC). Resolved from the GUI via the shared MVR helper
+	 * {@link net.preibisch.mvrecon.fiji.plugin.interestpointregistration.pairwise.PairwiseGUI#parseRansacQuery}
+	 * and consumed by {@code Matching.computeRANSAC}, which runs MVR's {@code RANSAC.computeRANSAC}.
 	 */
-	public static int ransacIterations = 1000;
-	
-	/**
-	 * minimal number of inliers to number of
-	 * candidates in RANSAC
-	 */
-	public static float minInlierRatio = 0.05f;
+	public static RANSACParameters ransacParameters = new RANSACParameters();
 
 	/**
 	 * if there is a ROI designed, how many iterations
@@ -50,27 +48,16 @@ public class DescriptorParameters
 	public static int maxIterations = 5;
 
 	/**
-	 * Max trust: reject candidates with a cost 
-	 * larger than maxTrust * median cost 
-	 */
-	public static float maxTrust = 4f;
-	
-	/**
 	 * How many times more inliers are required
 	 * than the minimum number of correspondences
 	 * required for the model.
-	 * 
+	 *
 	 * E.g. AffineModel3d needs at least 4 corresponences,
 	 * so we reject if the number of inliers is smaller
-	 * than minInlierFactor*4 
+	 * than minInlierFactor*4
 	 */
 	public static float minInlierFactor = 2f;
-	
-	/**
-	 * if true we use filterRANSAC, otherwise only RANSAC
-	 */
-	public static boolean filterRANSAC = true;
-	
+
 	/**
 	 * How similar two descriptors at least have to be
 	 */
@@ -94,6 +81,9 @@ public class DescriptorParameters
 	public static int minMaxType = 0;
 	public static double min = 0;
 	public static double max = 0;
+	// second image of a pairwise (non-series) registration, which may use a different intensity range
+	public static double min2 = 0;
+	public static double max2 = 0;
 
 	// for debug
 	public static boolean printAllSimilarities = false;
@@ -109,15 +99,34 @@ public class DescriptorParameters
 	public double significance;
 	public double ransacThreshold;
 	public int channel1, channel2;
-	
+
+	/**
+	 * The intensity min/max used to normalize the image(s) before DoG detection, resolved once by the
+	 * dialog so it is not recomputed (e.g. the multi-threaded global computation runs only a single time).
+	 * If {@code null}, each volume/slice is normalized by its own min/max (local, the default behaviour).
+	 * Headless callers may leave this {@code null} and instead set the static {@link #minMaxType}/{@link #min}/{@link #max}.
+	 */
+	public float[] minmax = null;
+
+	/**
+	 * Like {@link #minmax}, but for the second image of a pairwise (non-series) registration, so the two images can
+	 * use different intensity ranges. Unused (left {@code null}) for series registration.
+	 */
+	public float[] minmax2 = null;
+
 	public boolean regularize = false;
 	public boolean fixFirstTile = true;
 	public double lambda = 0.1;
 	
 	// for stack-registration
 	public int globalOpt; // 0=all-to-all; 1=all-to-all-withrange; 2=all-to-1; 3=Consecutive
-	public int range;	
+	public int range;
 	public String directory;
+
+	// parameters passed to mpicbg TileConfiguration.optimize( maxAllowedError, maxIterations, maxPlateauwidth ); defaults match the previously hard-coded values
+	public double globalOptMaxError = 10;
+	public int globalOptMaxIterations = 10000;
+	public int globalOptMaxPlateauwidth = 200;
 	
 	public boolean reApply = false;
 	public Roi roi1, roi2;

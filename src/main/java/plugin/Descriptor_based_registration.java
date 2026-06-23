@@ -46,8 +46,10 @@ import mpicbg.models.TranslationModel3D;
 import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.HelperFunctions;
 import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoG;
 import net.preibisch.mvrecon.fiji.plugin.interestpointdetection.interactive.InteractiveDoGParams;
+import net.preibisch.mvrecon.fiji.plugin.interestpointregistration.pairwise.PairwiseGUI;
 import net.preibisch.mvrecon.fiji.plugin.util.GUIHelper;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
+import net.preibisch.mvrecon.process.interestpointregistration.pairwise.methods.ransac.RANSACParameters;
 import net.preibisch.mvrecon.vecmath.Transform3D;
 import process.Matching;
 
@@ -265,6 +267,7 @@ public class Descriptor_based_registration implements PlugIn
 		gd.addChoice( "Approximate_size of detections", detectionSize, detectionSize[ defaultDetectionSize ] );
 		gd.addChoice( "Type_of_detections", detectionTypes, detectionTypes[ defaultDetectionType ] );
 		gd.addChoice( "Subpixel_Localization", Descriptor_based_series_registration.localizationChoice, Descriptor_based_series_registration.localizationChoice[ Descriptor_based_series_registration.defaultLocalization ] );
+		gd.addChoice( "Intensity (min/max)", Descriptor_based_series_registration.minMaxChoices, Descriptor_based_series_registration.minMaxChoices[ DescriptorParameters.minMaxType ] );
 
 		gd.addChoice( "Transformation_model", transformationModel, transformationModel[ defaultTransformationModel ] );
 		gd.addCheckbox( "Regularize_model", defaultRegularize );
@@ -286,7 +289,7 @@ public class Descriptor_based_registration implements PlugIn
 		}
 		gd.addSlider( "Redundancy for descriptor matching", 0, 10, defaultRedundancy );		
 		gd.addSlider( "Significance required for a descriptor match", 1.0, 10.0, defaultSignificance );
-		gd.addSlider( "Allowed_error_for_RANSAC (px)", 0.5, 20.0, defaultRansacThreshold );
+		PairwiseGUI.addRansacQuery( gd );
 
 		final int numChannels1 = imp1.getNChannels();
 		final int numChannels2 = imp2.getNChannels();
@@ -323,6 +326,7 @@ public class Descriptor_based_registration implements PlugIn
 		final int detectionSizeIndex = gd.getNextChoiceIndex();
 		final int detectionTypeIndex = gd.getNextChoiceIndex();
 		final int localization = gd.getNextChoiceIndex();
+		final int minMaxTypeIndex = gd.getNextChoiceIndex();
 
 		final int transformationModelIndex = gd.getNextChoiceIndex();
 		final boolean regularize = gd.getNextBoolean();
@@ -330,7 +334,11 @@ public class Descriptor_based_registration implements PlugIn
 		final int numNeighbors = (int)Math.round( gd.getNextNumber() );
 		final int redundancy = (int)Math.round( gd.getNextNumber() );
 		final double significance = gd.getNextNumber();
-		final double ransacThreshold = gd.getNextNumber();
+		final RANSACParameters ransacParameters = PairwiseGUI.parseRansacQuery( gd );
+		if ( ransacParameters == null ) // advanced RANSAC sub-dialog canceled
+			return null;
+		DescriptorParameters.ransacParameters = ransacParameters;
+		final double ransacThreshold = ransacParameters.getMaxEpsilon();
 		// zero-offset channel
 		final int channel1 = (int)Math.round( gd.getNextNumber() ) - 1;
 		final int channel2 = (int)Math.round( gd.getNextNumber() ) - 1;
@@ -354,7 +362,42 @@ public class Descriptor_based_registration implements PlugIn
 		defaultChannel2 = channel2 + 1;
 		defaultCreateOverlay = createOverlay;
 		defaultAddPointRoi = addPointRoi;
-		
+
+		// resolve the intensity min/max mode (default = local, i.e. the previous behaviour)
+		DescriptorParameters.minMaxType = minMaxTypeIndex;
+
+		if ( DescriptorParameters.minMaxType == 2 )
+		{
+			// the two images may have different intensity ranges, so ask for one min/max per image
+			final GenericDialog gdMinMax = new GenericDialog( "Define intensity min/max" );
+			gdMinMax.addMessage( "Image 1: " + imp1.getTitle() );
+			gdMinMax.addNumericField( "Image_1_min_intensity", DescriptorParameters.min, 4 );
+			gdMinMax.addNumericField( "Image_1_max_intensity", DescriptorParameters.max, 4 );
+			gdMinMax.addMessage( "Image 2: " + imp2.getTitle() );
+			gdMinMax.addNumericField( "Image_2_min_intensity", DescriptorParameters.min2, 4 );
+			gdMinMax.addNumericField( "Image_2_max_intensity", DescriptorParameters.max2, 4 );
+			gdMinMax.showDialog();
+
+			if ( gdMinMax.wasCanceled() )
+				return null;
+
+			DescriptorParameters.min = gdMinMax.getNextNumber();
+			DescriptorParameters.max = gdMinMax.getNextNumber();
+			DescriptorParameters.min2 = gdMinMax.getNextNumber();
+			DescriptorParameters.max2 = gdMinMax.getNextNumber();
+
+			params.minmax = new float[]{ (float)DescriptorParameters.min, (float)DescriptorParameters.max };
+			params.minmax2 = new float[]{ (float)DescriptorParameters.min2, (float)DescriptorParameters.max2 };
+		}
+		else if ( DescriptorParameters.minMaxType == 1 )
+		{
+			// per-image global min/max, computed once (multi-threaded), reused by preview and detection
+			params.minmax = Matching.computeMinMax( imp1, channel1 );
+			params.minmax2 = Matching.computeMinMax( imp2, channel2 );
+			IJ.log( imp1.getTitle() + ": min=" + params.minmax[ 0 ] + ", max=" + params.minmax[ 1 ] );
+			IJ.log( imp2.getTitle() + ": min=" + params.minmax2[ 0 ] + ", max=" + params.minmax2[ 1 ] );
+		}
+
 		// instantiate model
 		if ( dimensionality == 2 )
 		{
@@ -484,7 +527,8 @@ public class Descriptor_based_registration implements PlugIn
 		{
 			// query parameters interactively
 			final double[] values = new double[]{ defaultSigma, defaultThreshold };
-			final InteractiveDoGParams idog = getInteractiveDoGParameters( imp1, channel1, values, 20 );
+			// use the same intensity range as the actual detection so the tuned threshold transfers correctly
+			final InteractiveDoGParams idog = getInteractiveDoGParameters( imp1, channel1, values, 20, params.minmax );
 
 			// null means the user canceled the interactive DoG
 			if ( idog == null )
@@ -853,6 +897,16 @@ public class Descriptor_based_registration implements PlugIn
 	 */
 	public static InteractiveDoGParams getInteractiveDoGParameters( final ImagePlus imp, final int channel, final double values[], final float sigmaMax )
 	{
+		return getInteractiveDoGParameters( imp, channel, values, sigmaMax, null );
+	}
+
+	/**
+	 * @param minmaxOverride - if non-null, the intensity range [ min, max ] used to normalize the preview, so the
+	 *        interactively tuned threshold matches the actual detection (global/user-defined modes); if null, the
+	 *        auto display range of the preview is used (local mode).
+	 */
+	public static InteractiveDoGParams getInteractiveDoGParameters( final ImagePlus imp, final int channel, final double values[], final float sigmaMax, final float[] minmaxOverride )
+	{
 		// The rewritten InteractiveDoG wraps the whole ImagePlus (it has no channel argument), so for a
 		// multi-channel image we run the preview on a single-channel copy of the requested channel.
 		final ImagePlus impPreview;
@@ -883,10 +937,21 @@ public class Descriptor_based_registration implements PlugIn
 		params.sigma = values[ 0 ];
 		params.threshold = values.length == 2 ? values[ 1 ] : values[ 2 ];
 
-		// the rewritten InteractiveDoG requires an explicit (non-NaN) intensity range for the preview
-		impPreview.resetDisplayRange();
-		final double min = impPreview.getDisplayRangeMin();
-		final double max = impPreview.getDisplayRangeMax();
+		// the rewritten InteractiveDoG requires an explicit (non-NaN) intensity range for the preview;
+		// honor the chosen global/user-defined min/max so the tuned threshold matches the actual detection
+		final double min, max;
+		if ( minmaxOverride != null )
+		{
+			min = minmaxOverride[ 0 ];
+			max = minmaxOverride[ 1 ];
+			impPreview.setDisplayRange( min, max );
+		}
+		else
+		{
+			impPreview.resetDisplayRange();
+			min = impPreview.getDisplayRangeMin();
+			max = impPreview.getDisplayRangeMax();
+		}
 
 		final InteractiveDoG idog = new InteractiveDoG( impPreview, params, min, max );
 
