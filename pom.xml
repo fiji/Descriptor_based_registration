@@ -119,7 +119,7 @@
 		<legacyMode>true</legacyMode> <!-- NB: Make javadoc less strict about Java module system. -->
 
 		<!-- Pin to the just-released MVR (may be newer than what pom-scijava manages). -->
-		<multiview-reconstruction.version>9.0.6</multiview-reconstruction.version>
+		<multiview-reconstruction.version>9.0.9</multiview-reconstruction.version>
 
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>sign,deploy-to-scijava</releaseProfiles>
